@@ -5,18 +5,6 @@
 #[derive(Debug)]
 pub struct Config {
     /// Public name surface.
-    [6] Field: name
-    pub name: String
-
-
-[9-12] Enum: Mode
-pub enum Mode {
-    [10] Variant: Fast
-    Fast
-
-    [11] Variant: Slow
-    Slow
-
 
 /// Service behavior.
 [15-18] Trait: Service
@@ -26,20 +14,8 @@ pub trait Service {
     fn run(&self) -> String;
 
 
-[20] Type Alias: ResultAlias
-pub type ResultAlias<T> = Result<T, String>;
-
-[22-26] Macro: make_value
-macro_rules! make_value {
-    () => {
-        1
-    };
-}
-
 [28-42] Impl: Config
 impl Config {
-    [29] Constant: DEFAULT_NAME
-    pub const DEFAULT_NAME: &'static str = "treebrief";
 
     [31-41] Method: render
     pub fn render(

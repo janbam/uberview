@@ -109,7 +109,7 @@ fn javascript_single_file_matches_expected_output() {
 /// Verify the TypeScript reduced-source contract on a representative single file.
 #[test]
 fn typescript_single_file_matches_expected_output() {
-    // Lock the CLI contract for interfaces, type aliases, namespaces, fields, and nested helpers.
+    // Lock the CLI contract for retained grouping headers, callables, and nested helpers.
     let output = successful_stdout(run_treebrief(&fixture_path(
         "sample_project/src/typescript_sample.ts",
     )));
@@ -122,7 +122,7 @@ fn typescript_single_file_matches_expected_output() {
 /// Verify the Rust reduced-source contract on a representative single file.
 #[test]
 fn rust_single_file_matches_expected_output() {
-    // Lock the CLI contract for attributes, fields, traits, impls, macros, and opt-in returns.
+    // Lock the CLI contract for retained grouping headers, methods, and opt-in returns.
     let output = successful_stdout(run_treebrief(&fixture_path(
         "sample_project/src/rust_sample.rs",
     )));
@@ -390,10 +390,10 @@ fn overlapping_directory_roots_keep_stable_unique_order() {
     assert_eq!(output.matches("=== python_sample.py ===").count(), 1);
 }
 
-/// Verify that adjacent top-level symbols collapse into deterministic skipped-range placeholders.
+/// Verify that top-level symbol-only definitions disappear from the default reduced output.
 #[test]
-fn default_output_collapses_top_level_symbol_runs() {
-    // Pin the consolidation logic so large constant blocks stay readable without losing source order.
+fn default_output_omits_top_level_symbol_runs() {
+    // Keep the default map focused on places worth opening while leaving an opt-in escape hatch.
     let temp = tempdir().expect("failed to create temporary directory");
     let file = temp.path().join("top_level_symbols.py");
     std::fs::write(
@@ -408,9 +408,9 @@ fn default_output_collapses_top_level_symbol_runs() {
         &["--show-top-level-symbols"],
     ));
 
-    assert!(default_output.contains("[1-3] Skipped top-level assignments/constants (3 items)"));
-    assert!(default_output.contains("[9] Skipped top-level assignments/constants (1 item)"));
+    assert!(!default_output.contains("Skipped top-level assignments/constants"));
     assert!(!default_output.contains("Assignment: A"));
+    assert!(!default_output.contains("Assignment: D"));
     assert!(explicit_output.contains("[1] Assignment: A"));
     assert!(explicit_output.contains("[2] Assignment: B"));
     assert!(explicit_output.contains("[3] Assignment: C"));
@@ -418,10 +418,10 @@ fn default_output_collapses_top_level_symbol_runs() {
     assert!(!explicit_output.contains("Skipped top-level assignments/constants"));
 }
 
-/// Verify that plain top-level comments survive even when the following symbol run is collapsed.
+/// Verify that plain top-level comments survive even when the following symbol run is omitted.
 #[test]
-fn plain_top_level_comments_are_not_swallowed_by_symbol_placeholders() {
-    // Keep generic module-context comments visible while still collapsing the adjacent symbol run.
+fn plain_top_level_comments_are_not_swallowed_by_omitted_symbols() {
+    // Keep generic module-context comments visible even when the adjacent symbol run disappears.
     let temp = tempdir().expect("failed to create temporary directory");
     let file = temp.path().join("comment_then_symbols.py");
     std::fs::write(&file, "# module context\nA = 1\nB = 2\n")
@@ -430,7 +430,9 @@ fn plain_top_level_comments_are_not_swallowed_by_symbol_placeholders() {
     let output = successful_stdout(run_treebrief(&file));
 
     assert!(output.contains("# module context"));
-    assert!(output.contains("[2-3] Skipped top-level assignments/constants (2 items)"));
+    assert!(!output.contains("Skipped top-level assignments/constants"));
+    assert!(!output.contains("Assignment: A"));
+    assert!(!output.contains("Assignment: B"));
 }
 
 /// Verify that omitted runtime-scope indentation does not leak into retained body output.

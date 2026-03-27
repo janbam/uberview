@@ -6,14 +6,6 @@ export interface Service {
     [3] Method: run
     run(input: string): string
 
-    [4] Property: version
-    readonly version: string
-
-
-[7-9] Type Alias: Result
-export type Result<T> =
-  | { ok: true; value: T }
-  | { ok: false; error: string };
 
 [11-18] Namespace: helpers
 export namespace helpers {
@@ -27,8 +19,6 @@ export namespace helpers {
 
 [20-33] Class: Worker
 export class Worker {
-    [21] Field: kind
-    readonly kind: string = "worker"
 
     [23-32] Method: execute
     execute(

@@ -111,9 +111,12 @@ fn walk_children(
         }
 
         if let Some(capture) = capture_definition(language, child, source) {
-            items.push(Item::Definition(build_definition(
-                capture, language, source, options,
-            )));
+            // Retain only the definition kinds that still read like a useful source map entry.
+            if should_retain_definition(capture.kind, options) {
+                items.push(Item::Definition(build_definition(
+                    capture, language, source, options,
+                )));
+            }
             continue;
         }
 
@@ -169,6 +172,30 @@ fn dedupe_items(items: Vec<Item>) -> Vec<Item> {
     }
 
     deduped
+}
+
+/// Decide whether one captured definition belongs in the reduced default surface.
+fn should_retain_definition(kind: DefinitionKind, options: ExtractOptions) -> bool {
+    match kind {
+        DefinitionKind::Assignment | DefinitionKind::Constant | DefinitionKind::Variable => {
+            options.show_top_level_symbols
+        }
+        DefinitionKind::Class
+        | DefinitionKind::Function
+        | DefinitionKind::Impl
+        | DefinitionKind::Interface
+        | DefinitionKind::Method
+        | DefinitionKind::Module
+        | DefinitionKind::Namespace
+        | DefinitionKind::Struct
+        | DefinitionKind::Trait => true,
+        DefinitionKind::Enum
+        | DefinitionKind::Field
+        | DefinitionKind::Macro
+        | DefinitionKind::Property
+        | DefinitionKind::TypeAlias
+        | DefinitionKind::Variant => false,
+    }
 }
 
 /// Collapse adjacent top-level assignment-like definitions into one synthetic placeholder run.

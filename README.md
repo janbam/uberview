@@ -8,7 +8,7 @@ It is designed for fast codebase orientation:
 - every retained definition carries a line range
 - comments and docstrings are preserved generously
 - actual return statements are available with `--show-returns`
-- top-level assignment/constant blocks collapse by default and can be restored with `--show-top-level-symbols`
+- standalone top-level assignment/constant-style symbols are omitted by default and can be restored with `--show-top-level-symbols`
 - most ordinary executable code is omitted
 
 The output reads like reduced source, not metadata.
@@ -75,7 +75,8 @@ Rules:
 - `--show-line-numbers-for-all-items` extends bracketed line numbers to all retained items
 - default output omits return-like control-flow lines
 - `--show-returns` restores actual `return` statements without restoring `raise`, `yield`, or `throw`
-- default output collapses adjacent top-level assignment/constant-style symbols into skipped-range markers
+- default output keeps only structural container/callable definition headers plus comments and docstrings
+- standalone top-level assignment/constant-style symbols are omitted by default
 - `--show-top-level-symbols` restores those top-level symbol definitions explicitly
 - one invocation may accept several file and directory roots
 - output follows the caller's root order, then deterministic in-root ordering

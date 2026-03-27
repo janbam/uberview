@@ -154,6 +154,9 @@ fn render_skipped_range(range: &SkippedRange, depth: usize, lines: &mut Vec<Stri
         range.count,
         item_label
     ));
+
+    // Keep placeholder blocks separated just like real definition blocks.
+    lines.push(String::new());
 }
 
 /// Render any retained lines that were captured between the signature and the first named child.
