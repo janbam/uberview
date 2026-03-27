@@ -4,27 +4,6 @@ Tickets captured on 2026-03-27 after reviewing TreeBrief output for `/home/jan/w
 
 ## Active
 
-### TB-002 Make return rendering opt-in and limit it to true returns
-
-Goal:
-- Reduce noise from exit-like lines by showing actual function returns only when explicitly requested.
-
-Requirements:
-- Default output omits retained return lines.
-- Add `--show-returns` to surface actual `return` statements.
-- When enabled, show all actual returns, including early and nested returns.
-- Do not treat `raise`, `yield`, `yield from`, `throw`, or similar exit-like constructs as returns.
-
-Implementation Notes:
-- The extraction rules and the product spec currently talk about broader exit surfaces, so this ticket requires both implementation and spec updates.
-- Fixture output for at least Python and one non-Python language should pin the new policy.
-
-Done When:
-- `proposals.py` no longer shows `raise` lines in default output.
-- `--show-returns` restores actual `return` statements without restoring `raise` or `yield`.
-- CLI tests cover default and opt-in return behavior.
-- `README.md` and `DEV/SPEC.md` reflect the new return policy.
-
 ### TB-003 Hide top-level assignments by default and replace them with consolidated skipped-range markers
 
 Goal:
@@ -71,6 +50,7 @@ Done When:
 
 ## Completed
 
+- TB-002 Make return rendering opt-in and limit it to true returns. Closed on 2026-03-27 after validating the default suppression and `--show-returns` behavior against fixtures and `proposals.py`.
 - TB-001 Rework definition headers, line ranges, and spacing. Closed on 2026-03-27 after validating the new header contract, line-number flag, docs, and `proposals.py` output.
 
 ## Deferred

@@ -261,9 +261,13 @@ fn default_output_omits_exit_like_lines() {
 /// Verify that `--show-returns` restores only actual return statements.
 #[test]
 fn show_returns_restores_actual_returns_only() {
-    // Exercise both Python and Rust so keyword returns come back without reintroducing other exits.
+    // Exercise multiple language families so keyword returns come back without reintroducing other exits.
     let python_output = successful_stdout(run_treebrief_with_args(
         &fixture_path("sample_project/src/python_sample.py"),
+        &["--show-returns"],
+    ));
+    let javascript_output = successful_stdout(run_treebrief_with_args(
+        &fixture_path("sample_project/src/javascript_sample.js"),
         &["--show-returns"],
     ));
     let rust_output = successful_stdout(run_treebrief_with_args(
@@ -276,6 +280,12 @@ fn show_returns_restores_actual_returns_only() {
     assert!(python_output.contains("return [name.upper() for name in names]"));
     assert!(!python_output.contains("raise ValueError"));
     assert!(!python_output.contains("yield name.upper()"));
+
+    assert!(javascript_output.contains("return value.trim();"));
+    assert!(javascript_output.contains("return normalize(name);"));
+    assert!(javascript_output.contains("return (name) => `${prefix}: ${name}`;"));
+    assert!(javascript_output.contains("return `${name}!`;"));
+    assert!(!javascript_output.contains("throw new Error(\"missing prefix\")"));
 
     assert!(rust_output.contains("return Err(\"zero\".to_owned())"));
     assert!(!rust_output.contains("parse::<usize>()?"));
