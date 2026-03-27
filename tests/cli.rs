@@ -451,7 +451,7 @@ fn omitted_runtime_scope_indentation_collapses_to_retained_container_depth() {
 
     assert!(output.contains("    # Keep only the retained depth."));
     assert!(!output.contains("        # Keep only the retained depth."));
-    assert!(output.contains("\n\n    [4-6] Function: nested"));
+    assert!(output.contains("\n\n    # Keep only the retained depth.\n    [4-6] Function: nested"));
     assert!(!output.contains("\n\n        [4-6] Function: nested"));
     assert!(output.contains("        # Nested comment."));
 }

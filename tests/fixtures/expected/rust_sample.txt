@@ -13,7 +13,6 @@ pub trait Service {
     [17] Method: run
     fn run(&self) -> String;
 
-
 [28-42] Impl: Config
 impl Config {
 
@@ -22,7 +21,6 @@ impl Config {
         &self,
     ) -> Result<String, String> {
         // Keep the early-exit line.
-
 
 [44-47] Function: build_message
 pub fn build_message(name: &str) -> String {

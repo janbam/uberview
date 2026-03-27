@@ -124,10 +124,15 @@ pub enum Item {
 
 impl Item {
     /// Return the first byte retained by the item for ordering and deduplication.
-    pub const fn start_byte(&self) -> usize {
+    pub fn start_byte(&self) -> usize {
         match self {
             Self::Snippet(snippet) => snippet.span.start_byte,
-            Self::Definition(definition) => definition.header_span.start_byte,
+            Self::Definition(definition) => definition
+                .leading_comment_snippets
+                .first()
+                .map_or(definition.header_span.start_byte, |snippet| {
+                    snippet.span.start_byte
+                }),
             Self::SkippedRange(range) => range.span.start_byte,
         }
     }
@@ -147,6 +152,8 @@ pub struct Definition {
     pub kind: DefinitionKind,
     /// The source-derived symbol name shown in the synthetic header line.
     pub name: String,
+    /// The directly attached leading comment snippets that belong to this definition block.
+    pub leading_comment_snippets: Vec<Snippet>,
     /// The full source extent of the definition.
     pub span: TextSpan,
     /// The source slice used for the retained header line(s).

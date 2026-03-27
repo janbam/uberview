@@ -113,7 +113,12 @@ fn render_definition(
 
     // Separate nested containers from prior body content so their headers scan as structure, not prose.
     if should_precede_nested_container_with_blank_line(definition, depth, lines) {
-        lines.push(String::new());
+        push_blank_line_if_needed(lines);
+    }
+
+    // Emit attached leading comments as part of the definition block, not as sibling prose.
+    for snippet in &definition.leading_comment_snippets {
+        render_snippet(snippet, section, options, depth, lines);
     }
 
     // Add the synthetic summary line before the retained source so large files scan faster.
@@ -140,7 +145,7 @@ fn render_definition(
     }
 
     // Separate whole definition blocks so adjacent structure does not visually collapse together.
-    lines.push(String::new());
+    push_blank_line_if_needed(lines);
 }
 
 /// Render a synthetic placeholder for one omitted top-level symbol run.
@@ -156,7 +161,7 @@ fn render_skipped_range(range: &SkippedRange, depth: usize, lines: &mut Vec<Stri
     ));
 
     // Keep placeholder blocks separated just like real definition blocks.
-    lines.push(String::new());
+    push_blank_line_if_needed(lines);
 }
 
 /// Render any retained lines that were captured between the signature and the first named child.
@@ -251,6 +256,15 @@ fn split_leading_whitespace(line: &str) -> (&str, &str) {
 /// Return the indentation prefix for one retained-container depth.
 fn render_indent(depth: usize) -> String {
     OUTPUT_INDENT.repeat(depth)
+}
+
+/// Ensure the current rendered scope ends with exactly one blank separator line.
+fn push_blank_line_if_needed(lines: &mut Vec<String>) {
+    if lines.last().is_some_and(|line| line.is_empty()) {
+        return;
+    }
+
+    lines.push(String::new());
 }
 
 /// Decide whether one nested definition should be visually separated from prior body content.

@@ -8,12 +8,11 @@ def top_level(
     value: int,
 ) -> int:
     """Handle the top-level case."""
-    # Normalize before branching.
 
+    # Normalize before branching.
     [14-16] Function: nested
     def nested(value: int) -> int:
         # Leave the nested exit visible.
-
 
 [24-27] Function: stream_names
 def stream_names(names: list[str]):
