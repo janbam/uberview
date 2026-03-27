@@ -30,6 +30,7 @@ It is a reliable structural map.
 ## Goals
 
 - Work on a single file or a whole directory tree
+- Accept one or more input paths in a single invocation
 - Auto-detect language
 - Support Python, JavaScript, TypeScript, and Rust
 - Preserve source order exactly
@@ -62,14 +63,16 @@ JSON may exist internally or as an implementation aid, but it is not part of the
 ## CLI
 
 ```text
-treebrief [--show-line-numbers-for-all-items] [--show-returns] [--show-top-level-symbols] <path>
+treebrief [--show-line-numbers-for-all-items] [--show-returns] [--show-top-level-symbols] <path> [path...]
 ```
 
 Where:
 
-- `<path>` may be a file or a directory
+- each `<path>` may be a file or a directory
 - a file produces one file overview
 - a directory recursively scans supported code files and produces one overview per file
+- multiple inputs are processed in the order the user provided them
+- overlapping inputs are deduplicated so each concrete file is rendered once
 
 The default invocation must be enough for normal use.
 
@@ -120,6 +123,12 @@ Default ignore behavior should skip obvious generated and dependency directories
 - `vendor`
 
 The tool must not require the user to run it from project root.
+
+When several inputs are provided:
+
+- preserve the caller's input-root order exactly
+- keep the existing deterministic ordering within each directory root
+- deduplicate overlaps so repeated files or broader later roots do not emit duplicate sections
 
 ## Output Contract
 
@@ -402,15 +411,16 @@ The tool is successful when all of the following are true:
 
 1. Running `treebrief <file>` prints a reduced-source overview for that file.
 2. Running `treebrief <directory>` prints reduced-source overviews for all supported files recursively.
-3. The tool works from any current working directory.
-4. Definition lines always include correct line ranges.
-5. Multiline definitions are preserved instead of truncated.
-6. Nested definitions are indented and remain in source order.
-7. Comments and docstrings in slightly non-standard positions are still usually preserved.
-8. Default output omits return-like lines, and `--show-returns` restores actual returns only.
-9. Default output collapses contiguous top-level assignment/constant-style symbol runs, and `--show-top-level-symbols` restores them explicitly.
-10. Output is deterministic.
-11. Multiple concurrent runs do not interfere with each other.
+3. Running `treebrief <path1> <path2> ...` preserves root order and deduplicates overlaps.
+4. The tool works from any current working directory.
+5. Definition lines always include correct line ranges.
+6. Multiline definitions are preserved instead of truncated.
+7. Nested definitions are indented and remain in source order.
+8. Comments and docstrings in slightly non-standard positions are still usually preserved.
+9. Default output omits return-like lines, and `--show-returns` restores actual returns only.
+10. Default output collapses contiguous top-level assignment/constant-style symbol runs, and `--show-top-level-symbols` restores them explicitly.
+11. Output is deterministic.
+12. Multiple concurrent runs do not interfere with each other.
 
 ## Test Matrix
 
@@ -462,6 +472,8 @@ The test corpus must include at least:
 
 - file outside current working directory
 - directory scan from a parent path
+- mixed file and directory inputs in one invocation
+- overlapping roots and repeated file arguments
 - concurrent runs
 - syntax error recovery
 - generated/dependency directories skipped by default

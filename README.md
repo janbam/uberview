@@ -25,7 +25,7 @@ TreeBrief auto-detects languages by extension first, then filename patterns, the
 ## Install And Run
 
 ```bash
-cargo run -- <path>
+cargo run -- <path> [path...]
 ```
 
 Examples:
@@ -33,6 +33,7 @@ Examples:
 ```bash
 cargo run -- src/lib.rs
 cargo run -- .
+cargo run -- src/lib.rs src/app.rs
 cargo run -- --show-line-numbers-for-all-items src/lib.rs
 cargo run -- --show-returns src/lib.rs
 cargo run -- --show-top-level-symbols src/lib.rs
@@ -74,6 +75,9 @@ Rules:
 - `--show-returns` restores actual `return` statements without restoring `raise`, `yield`, or `throw`
 - default output collapses adjacent top-level assignment/constant-style symbols into skipped-range markers
 - `--show-top-level-symbols` restores those top-level symbol definitions explicitly
+- one invocation may accept several file and directory roots
+- output follows the caller's root order, then deterministic in-root ordering
+- overlapping inputs are deduplicated so each file section appears once
 - files with no retained structure still emit a section with `(no retained structure)`
 
 ## Default Directory Ignore Rules

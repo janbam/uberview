@@ -292,6 +292,104 @@ fn show_returns_restores_actual_returns_only() {
     assert!(!rust_output.contains("Ok(self.name.clone())"));
 }
 
+/// Verify that mixed file and directory inputs preserve root order while deduplicating overlaps.
+#[test]
+fn mixed_file_and_directory_inputs_keep_order_without_duplicates() {
+    // Keep the caller's root order stable even when one explicit file is also reachable via a later directory root.
+    let file = fixture_path("sample_project/src/python_sample.py");
+    let directory = fixture_path("sample_project");
+    let output = successful_stdout(
+        Command::new(binary_path())
+            .arg(&file)
+            .arg(&file)
+            .arg(&directory)
+            .output()
+            .expect("failed to run treebrief with mixed inputs"),
+    );
+
+    assert_in_order(
+        &output,
+        &[
+            "=== tests/fixtures/sample_project/src/python_sample.py ===",
+            "=== scripts/python_tool ===",
+            "=== src/javascript_sample.js ===",
+            "=== src/python_broken.py ===",
+            "=== src/rust_sample.rs ===",
+            "=== src/typescript_sample.ts ===",
+        ],
+    );
+    assert_eq!(
+        output
+            .matches("=== tests/fixtures/sample_project/src/python_sample.py ===")
+            .count(),
+        1
+    );
+}
+
+/// Verify that normalized-equivalent input spellings still deduplicate to one concrete file.
+#[test]
+fn normalized_file_input_deduplicates_against_later_directory_root() {
+    // Collapse spelling-only path differences so `..` segments cannot reintroduce duplicate sections.
+    let odd_spelling = PathBuf::from("tests/fixtures/sample_project/src/../src/python_sample.py");
+    let directory = PathBuf::from("tests/fixtures/sample_project");
+    let output = successful_stdout(
+        Command::new(binary_path())
+            .current_dir(env!("CARGO_MANIFEST_DIR"))
+            .arg(&odd_spelling)
+            .arg(&directory)
+            .output()
+            .expect("failed to run treebrief with normalized-equivalent inputs"),
+    );
+
+    assert_in_order(
+        &output,
+        &[
+            "=== tests/fixtures/sample_project/src/../src/python_sample.py ===",
+            "=== scripts/python_tool ===",
+            "=== src/javascript_sample.js ===",
+            "=== src/python_broken.py ===",
+            "=== src/rust_sample.rs ===",
+            "=== src/typescript_sample.ts ===",
+        ],
+    );
+    assert_eq!(
+        output
+            .matches("=== tests/fixtures/sample_project/src/../src/python_sample.py ===")
+            .count(),
+        1
+    );
+    assert!(!output.contains("=== src/python_sample.py ==="));
+}
+
+/// Verify that overlapping directory roots contribute unique files in root order.
+#[test]
+fn overlapping_directory_roots_keep_stable_unique_order() {
+    // Make sure the later broader root only adds files the earlier narrower root did not already cover.
+    let narrow_root = fixture_path("sample_project/src");
+    let broad_root = fixture_path("sample_project");
+    let output = successful_stdout(
+        Command::new(binary_path())
+            .arg(&narrow_root)
+            .arg(&broad_root)
+            .output()
+            .expect("failed to run treebrief with overlapping directories"),
+    );
+
+    assert_in_order(
+        &output,
+        &[
+            "=== javascript_sample.js ===",
+            "=== python_broken.py ===",
+            "=== python_sample.py ===",
+            "=== rust_sample.rs ===",
+            "=== typescript_sample.ts ===",
+            "=== scripts/python_tool ===",
+        ],
+    );
+    assert_eq!(output.matches("=== javascript_sample.js ===").count(), 1);
+    assert_eq!(output.matches("=== python_sample.py ===").count(), 1);
+}
+
 /// Verify that adjacent top-level symbols collapse into deterministic skipped-range placeholders.
 #[test]
 fn default_output_collapses_top_level_symbol_runs() {
