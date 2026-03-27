@@ -39,6 +39,7 @@ pub fn extract_file(
     } else {
         collapse_top_level_symbols(items, &source)
     };
+    let items = attach_leading_comment_snippets(items, &source);
 
     Ok(FileSection {
         display_path,
@@ -139,7 +140,9 @@ fn build_definition(
 ) -> Definition {
     let items = capture
         .body
-        .map(|body| collect_items(body, language, source, options))
+        .map(|body| {
+            attach_leading_comment_snippets(collect_items(body, language, source, options), source)
+        })
         .unwrap_or_default();
     let start = source.line_number_at(capture.header_span.start_byte);
     let end = source.line_number_at(capture.span.end_byte.saturating_sub(1));
@@ -148,6 +151,7 @@ fn build_definition(
         // Keep the header metadata fully source-derived so later rendering stays deterministic.
         kind: capture.kind,
         name: capture.name,
+        leading_comment_snippets: Vec::new(),
         span: capture.span,
         header_span: source.trim_trailing_line_breaks(capture.header_span),
         line_range: LineRange { start, end },
@@ -243,6 +247,78 @@ fn collapse_top_level_symbols(items: Vec<Item>, source: &SourceText) -> Vec<Item
     collapsed
 }
 
+/// Attach directly adjoining leading comment snippets to the definition block they describe.
+fn attach_leading_comment_snippets(items: Vec<Item>, source: &SourceText) -> Vec<Item> {
+    let mut attached = Vec::new();
+    let mut pending_comments = Vec::new();
+
+    for item in items {
+        match item {
+            Item::Snippet(snippet) if is_attachable_comment_snippet(source, snippet) => {
+                // Buffer only comment snippets so a directly adjoining definition can claim them.
+                pending_comments.push(snippet);
+            }
+            Item::Definition(mut definition) => {
+                // Keep only the comment suffix that sits flush against this definition.
+                let split_index = attached_comment_suffix_start(
+                    &pending_comments,
+                    definition.line_range.start,
+                    source,
+                );
+
+                for snippet in pending_comments.drain(..split_index) {
+                    attached.push(Item::Snippet(snippet));
+                }
+
+                definition
+                    .leading_comment_snippets
+                    .extend(pending_comments.drain(..));
+                attached.push(Item::Definition(definition));
+            }
+            other => {
+                // Flush buffered comments once a non-definition boundary proves they stand alone.
+                for snippet in pending_comments.drain(..) {
+                    attached.push(Item::Snippet(snippet));
+                }
+
+                attached.push(other);
+            }
+        }
+    }
+
+    // Preserve any trailing comments that never found an attached definition.
+    for snippet in pending_comments {
+        attached.push(Item::Snippet(snippet));
+    }
+
+    attached
+}
+
+/// Return the first buffered comment index that belongs to the following definition.
+fn attached_comment_suffix_start(
+    pending_comments: &[Snippet],
+    definition_start_line: usize,
+    source: &SourceText,
+) -> usize {
+    let mut attach_start = pending_comments.len();
+    let mut next_start_line = definition_start_line;
+
+    // Walk backward so only one contiguous trailing comment run binds to the definition.
+    while attach_start > 0 {
+        let snippet = pending_comments[attach_start - 1];
+        let lines = snippet_line_range(source, snippet);
+
+        if lines.end + 1 != next_start_line {
+            break;
+        }
+
+        next_start_line = lines.start;
+        attach_start -= 1;
+    }
+
+    attach_start
+}
+
 /// Decide whether a top-level definition should be hidden behind a symbol placeholder by default.
 fn should_skip_top_level_symbol(definition: &Definition) -> bool {
     matches!(
@@ -264,7 +340,7 @@ fn belongs_to_skipped_symbol_run(
     match item {
         Item::Definition(definition) => should_skip_top_level_symbol(definition),
         Item::Snippet(snippet) => {
-            is_symbol_attached_comment_snippet(source, *snippet)
+            is_attachable_comment_snippet(source, *snippet)
                 && (comment_adjoins_skipped_symbol(items, index, source, -1)
                     || comment_adjoins_skipped_symbol(items, index, source, 1))
         }
@@ -345,15 +421,12 @@ fn trimmed_node_text(source: &SourceText, node: Node<'_>) -> String {
     source.span_text(node_span(node)).trim().to_owned()
 }
 
-/// Decide whether a top-level snippet reads like a symbol-attached doc comment.
-fn is_symbol_attached_comment_snippet(source: &SourceText, snippet: Snippet) -> bool {
+/// Decide whether a retained snippet is a comment that can attach to a following definition.
+fn is_attachable_comment_snippet(source: &SourceText, snippet: Snippet) -> bool {
     let text = source.span_text(source.trim_trailing_line_breaks(snippet.span));
     let trimmed = text.trim_start();
 
-    trimmed.starts_with("#:")
-        || trimmed.starts_with("///")
-        || trimmed.starts_with("//!")
-        || trimmed.starts_with("/**")
+    trimmed.starts_with('#') || trimmed.starts_with("//") || trimmed.starts_with("/*")
 }
 
 /// Decide whether a comment snippet sits flush against a skipped symbol definition on one side.

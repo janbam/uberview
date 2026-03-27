@@ -6,7 +6,6 @@ export interface Service {
     [3] Method: run
     run(input: string): string
 
-
 [11-18] Namespace: helpers
 export namespace helpers {
 
@@ -16,7 +15,6 @@ export namespace helpers {
     ) => {
         // Return the formatted label.
 
-
 [20-33] Class: Worker
 export class Worker {
 
@@ -24,7 +22,7 @@ export class Worker {
     execute(
       input: string,
     ): string {
-        // Keep the nested helper.
 
+        // Keep the nested helper.
         [27-29] Function: normalize
         function normalize(value: string): string {
