@@ -4,8 +4,8 @@
 
 | Area | Scenario | Status |
 | --- | --- | --- |
-| CLI | `treebrief <file>` produces one file section | Passed |
-| CLI | `treebrief <directory>` produces deterministic multi-file output | Passed |
+| CLI | `uberview <file>` produces one file section | Passed |
+| CLI | `uberview <directory>` produces deterministic multi-file output | Passed |
 | Detection | Extension-based language detection for all supported languages | Passed |
 | Detection | Filename and shebang/content sniffing fallback where relevant | Passed |
 | Python | Docstrings, decorators, nested defs, multiline signatures, exits | Passed |

@@ -1,7 +1,7 @@
 use clap::Parser;
 use std::process::ExitCode;
 
-use treebrief::{app, cli::Cli};
+use uberview::{app, cli::Cli};
 
 /// Parse CLI arguments and delegate execution to the application layer.
 fn main() -> ExitCode {

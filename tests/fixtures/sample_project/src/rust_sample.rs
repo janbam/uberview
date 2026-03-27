@@ -26,7 +26,7 @@ macro_rules! make_value {
 }
 
 impl Config {
-    pub const DEFAULT_NAME: &'static str = "treebrief";
+    pub const DEFAULT_NAME: &'static str = "uberview";
 
     pub fn render(
         &self,

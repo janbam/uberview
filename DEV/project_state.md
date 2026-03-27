@@ -18,7 +18,7 @@
 
 ## Active Goal
 
-Build TreeBrief from the spec into a production-ready CLI that emits reduced-source structural overviews for Python, JavaScript, TypeScript, and Rust.
+Build Uberview from the spec into a production-ready CLI that emits reduced-source structural overviews for Python, JavaScript, TypeScript, and Rust.
 
 ## Current Slice
 
@@ -36,8 +36,8 @@ Build TreeBrief from the spec into a production-ready CLI that emits reduced-sou
 
 ## Completion Criteria
 
-- `treebrief <file>` renders a reduced-source overview with correct definition line ranges.
-- `treebrief <directory>` scans supported files recursively in deterministic relative-path order.
+- `uberview <file>` renders a reduced-source overview with correct definition line ranges.
+- `uberview <directory>` scans supported files recursively in deterministic relative-path order.
 - Python, JavaScript, TypeScript, and Rust are supported with nested definitions, comments/docstrings, and exits preserved.
 - Automated checks cover unit, integration, and end-to-end CLI behavior.
 - Documentation, CI, and operational basics exist and reflect the shipped system.

@@ -52,7 +52,7 @@ It is a reliable structural map.
 - Deep filtering or shaping controls in v1
 - Replacing direct source reads entirely
 
-TreeBrief is meant to guide targeted source reads, not eliminate them.
+Uberview is meant to guide targeted source reads, not eliminate them.
 
 ## Primary Artifact
 
@@ -63,7 +63,7 @@ JSON may exist internally or as an implementation aid, but it is not part of the
 ## CLI
 
 ```text
-treebrief [--show-line-numbers-for-all-items] [--show-returns] [--show-top-level-symbols] <path> [path...]
+uberview [--show-line-numbers-for-all-items] [--show-returns] [--show-top-level-symbols] <path> [path...]
 ```
 
 Where:
@@ -412,9 +412,9 @@ Parallel execution must not depend on temp files named from the current working 
 
 The tool is successful when all of the following are true:
 
-1. Running `treebrief <file>` prints a reduced-source overview for that file.
-2. Running `treebrief <directory>` prints reduced-source overviews for all supported files recursively.
-3. Running `treebrief <path1> <path2> ...` preserves root order and deduplicates overlaps.
+1. Running `uberview <file>` prints a reduced-source overview for that file.
+2. Running `uberview <directory>` prints reduced-source overviews for all supported files recursively.
+3. Running `uberview <path1> <path2> ...` preserves root order and deduplicates overlaps.
 4. The tool works from any current working directory.
 5. Definition lines always include correct line ranges.
 6. Multiline definitions are preserved instead of truncated.

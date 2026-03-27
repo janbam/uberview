@@ -272,7 +272,7 @@ fn attach_leading_comment_snippets(items: Vec<Item>, source: &SourceText) -> Vec
 
                 definition
                     .leading_comment_snippets
-                    .extend(pending_comments.drain(..));
+                    .append(&mut pending_comments);
                 attached.push(Item::Definition(definition));
             }
             other => {
