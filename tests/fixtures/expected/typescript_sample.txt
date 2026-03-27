@@ -1,0 +1,24 @@
+=== tests/fixtures/sample_project/src/typescript_sample.ts ===
+
+/** TypeScript API docs. */
+2-5	export interface Service {
+3-3	  run(input: string): string
+4-4	  readonly version: string
+7-9	export type Result<T> =
+  | { ok: true; value: T }
+  | { ok: false; error: string };
+11-18	export namespace helpers {
+12-17	  export const format = (
+    prefix: string,
+  ) => {
+    // Return the formatted label.
+    return (value: string): string => `${prefix}:${value}`;
+20-33	export class Worker {
+21-21	  readonly kind: string = "worker"
+23-32	  execute(
+    input: string,
+  ): string {
+    // Keep the nested helper.
+27-29	    function normalize(value: string): string {
+      return value.trim();
+    return normalize(input);

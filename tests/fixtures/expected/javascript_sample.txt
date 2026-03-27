@@ -1,0 +1,21 @@
+=== tests/fixtures/sample_project/src/javascript_sample.js ===
+
+/** JavaScript module docs. */
+// Exported helper context.
+4-11	export function greet(name) {
+  /** Normalize before returning. */
+6-8	  function normalize(value) {
+    return value.trim();
+  return normalize(name);
+/** Builder docs. */
+14-23	export const buildGreeter = (
+  prefix,
+) => {
+  // Reject empty prefixes.
+    throw new Error("missing prefix");
+  return (name) => `${prefix}: ${name}`;
+25-31	class Greeter {
+  /** Format one name. */
+27-30	  format(name) {
+    // Keep the method exit.
+    return `${name}!`;

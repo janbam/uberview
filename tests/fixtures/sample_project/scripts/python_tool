@@ -1,0 +1,7 @@
+#!/usr/bin/env python3
+"""Tool entrypoint."""
+
+
+def main() -> int:
+    """Run the script."""
+    return 0
