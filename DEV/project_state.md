@@ -6,15 +6,15 @@
 - Local `main` and `origin/main` were verified in sync before implementation.
 - Repository contents at start: `.git/`, `DEV/`, and `DEV/SPEC.md`.
 - GitHub CLI is authenticated for `yannbam`; a remote-backed milestone loop is available if needed.
-- The implementation is now complete on branch `feat/core-extraction`.
+- The implementation is now merged into `main` through two reviewed PRs.
 - The repository toolchain is pinned to Rust `1.88.0` for local/CI parity.
 - Final verification completed successfully:
   - `cargo fmt --check`
   - `cargo clippy --all-targets -- -D warnings`
   - `cargo test`
   - `cargo run --quiet -- tests/fixtures/sample_project`
-- Final hardening branch in progress: `fix/parse-failure-reporting`.
 - A dedicated `gpt-5.4` high reviewer found no actionable issues in the hardening diff.
+- Final hardening PR `#2` merged successfully.
 
 ## Active Goal
 
@@ -25,7 +25,7 @@ Build TreeBrief from the spec into a production-ready CLI that emits reduced-sou
 1. Completed: scaffolded the Rust CLI crate and the extraction/rendering pipeline.
 2. Completed: implemented multi-language tree-sitter extraction for Python, JavaScript, TypeScript, TSX, and Rust.
 3. Completed: added fixture-driven end-to-end validation, CI, README, and runbook.
-4. In progress: final hardening for explicit parse-failure reporting and lower-overhead language detection during directory scans.
+4. Completed: final hardening for explicit parse-failure reporting and lower-overhead language detection during directory scans.
 
 ## Milestones
 
@@ -57,9 +57,9 @@ Build TreeBrief from the spec into a production-ready CLI that emits reduced-sou
 
 ## Current Verification Snapshot
 
-- `cargo fmt --check` passes on `fix/parse-failure-reporting`.
-- `cargo clippy --all-targets -- -D warnings` passes on `fix/parse-failure-reporting`.
-- `cargo test` passes on `fix/parse-failure-reporting` with 11 total tests:
+- `cargo fmt --check` passes on `main`.
+- `cargo clippy --all-targets -- -D warnings` passes on `main`.
+- `cargo test` passes on `main` with 11 total tests:
   - 2 language detection unit tests
   - 9 CLI/integration tests
 - New hardening behavior verified:
