@@ -1,6 +1,7 @@
 use anyhow::{Context, Result, bail};
 use ignore::WalkBuilder;
-use std::fs;
+use std::fs::{self, File};
+use std::io::Read;
 use std::path::{Component, Path, PathBuf};
 
 use crate::language::{self, LanguageKind};
@@ -47,10 +48,8 @@ pub fn resolve_input(path: &Path) -> Result<InputTarget> {
         bail!("path is neither a regular file nor a directory");
     }
 
-    let source = fs::read_to_string(&actual_path)
-        .with_context(|| format!("failed to read {}", actual_path.to_string_lossy()))?;
-    let language =
-        language::require_language(&actual_path, Some(language::sniff_content_prefix(&source)))?;
+    let language = detect_language_for_file(&actual_path)?
+        .with_context(|| format!("unsupported source file: {}", actual_path.to_string_lossy()))?;
     let display_path = display_single_file(path, &actual_path)?;
 
     Ok(InputTarget::File(DiscoveredFile {
@@ -90,14 +89,7 @@ pub fn discover_directory_files(root: &Path) -> Result<Vec<DiscoveredFile>> {
             continue;
         }
 
-        let source = match fs::read_to_string(entry.path()) {
-            Ok(source) => source,
-            Err(_) => continue,
-        };
-
-        let Some(language) =
-            language::detect_language(entry.path(), Some(language::sniff_content_prefix(&source)))
-        else {
+        let Some(language) = detect_language_for_file(entry.path()).ok().flatten() else {
             continue;
         };
 
@@ -119,6 +111,37 @@ pub fn discover_directory_files(root: &Path) -> Result<Vec<DiscoveredFile>> {
     files.sort_by(|left, right| left.display_path.cmp(&right.display_path));
 
     Ok(files)
+}
+
+/// Detect the language for one concrete filesystem path while minimizing file IO.
+fn detect_language_for_file(path: &Path) -> Result<Option<LanguageKind>> {
+    // Use path metadata first so supported extensions and known filenames avoid unnecessary reads.
+    if let Some(language) = language::detect_language(path, None) {
+        return Ok(Some(language));
+    }
+
+    if path.extension().is_some() {
+        return Ok(None);
+    }
+
+    let sniff = read_sniff_prefix(path)?;
+
+    Ok(language::detect_language(path, Some(&sniff)))
+}
+
+/// Read only the small leading prefix needed for shebang sniffing.
+fn read_sniff_prefix(path: &Path) -> Result<String> {
+    const SNIFF_LIMIT: usize = 256;
+
+    // Keep extensionless-path detection cheap and avoid loading whole files during discovery.
+    let mut file =
+        File::open(path).with_context(|| format!("failed to read {}", path.to_string_lossy()))?;
+    let mut buffer = [0_u8; SNIFF_LIMIT];
+    let bytes_read = file
+        .read(&mut buffer)
+        .with_context(|| format!("failed to read {}", path.to_string_lossy()))?;
+
+    Ok(String::from_utf8_lossy(&buffer[..bytes_read]).into_owned())
 }
 
 /// Decide whether a path should be skipped by the default directory traversal behavior.

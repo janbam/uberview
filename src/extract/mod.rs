@@ -1,9 +1,8 @@
 mod javascript;
 mod python;
 mod rust;
-
-use anyhow::Result;
-use tree_sitter::{Node, Parser};
+use anyhow::{Result, bail};
+use tree_sitter::{Node, Parser, Point};
 
 use crate::language::{self, LanguageKind};
 use crate::model::{Definition, FileSection, Item, LineRange, Snippet, TextSpan};
@@ -21,6 +20,7 @@ pub fn extract_file(
     language::configure_parser(&mut parser, language)?;
     let tree = language::parse_source(&mut parser, source.as_str())?;
     let root = tree.root_node();
+    ensure_tree_has_no_syntax_errors(root, &display_path)?;
     let items = collect_items(root, language, &source);
 
     Ok(FileSection {
@@ -28,6 +28,23 @@ pub fn extract_file(
         source,
         items,
     })
+}
+
+/// Reject syntax trees that required error recovery so callers can report clear file-level failures.
+fn ensure_tree_has_no_syntax_errors(root: Node<'_>, display_path: &str) -> Result<()> {
+    if !root.has_error() {
+        return Ok(());
+    }
+
+    let (kind, point) = first_syntax_issue(root)
+        .map(|node| syntax_issue_details(node))
+        .unwrap_or(("syntax error".to_owned(), root.start_position()));
+
+    bail!(
+        "parse failed for {display_path}: {kind} near line {}, column {}",
+        point.row + 1,
+        point.column + 1
+    );
 }
 
 /// The extracted definition metadata needed to build the reduced internal model.
@@ -179,6 +196,36 @@ fn node_span(node: Node<'_>) -> TextSpan {
 /// Build a span from an explicit byte range.
 fn explicit_span(start_byte: usize, end_byte: usize) -> TextSpan {
     TextSpan::new(start_byte, end_byte)
+}
+
+/// Find the first concrete syntax issue inside a recovered tree.
+fn first_syntax_issue(node: Node<'_>) -> Option<Node<'_>> {
+    if node.is_error() || node.is_missing() {
+        return Some(node);
+    }
+
+    let mut cursor = node.walk();
+
+    for child in node.children(&mut cursor) {
+        if let Some(issue) = first_syntax_issue(child) {
+            return Some(issue);
+        }
+    }
+
+    None
+}
+
+/// Describe one concrete syntax issue in user-facing terms.
+fn syntax_issue_details(node: Node<'_>) -> (String, Point) {
+    if node.is_missing() {
+        return ("missing syntax".to_owned(), node.start_position());
+    }
+
+    if node.is_error() {
+        return ("syntax error".to_owned(), node.start_position());
+    }
+
+    ("recovered syntax error".to_owned(), node.start_position())
 }
 
 /// Extend a header slice to include the opening delimiter of a body node when present.

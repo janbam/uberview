@@ -12,6 +12,15 @@ fn fixture_path(relative: &str) -> PathBuf {
         .join(relative)
 }
 
+/// Return the path text that the CLI should render for a fixture invoked from the repo root.
+fn fixture_display_path(relative: &str) -> String {
+    fixture_path(relative)
+        .strip_prefix(env!("CARGO_MANIFEST_DIR"))
+        .expect("fixture should live under the repository root")
+        .to_string_lossy()
+        .to_string()
+}
+
 /// Return the compiled binary path exposed by Cargo integration tests.
 fn binary_path() -> &'static str {
     env!("CARGO_BIN_EXE_treebrief")
@@ -135,9 +144,57 @@ fn directory_scan_is_deterministic_and_skips_default_ignored_dirs() {
             "=== src/typescript_sample.ts ===",
         ],
     );
-    assert!(output.contains("(no retained structure)"));
+    assert!(output.contains("!! parse failed: parse failed for src/python_broken.py:"));
     assert!(!output.contains("node_modules/ignored.js"));
     assert!(!output.contains("target/ignored.rs"));
+}
+
+/// Verify that a broken single file fails clearly instead of pretending to be empty.
+#[test]
+fn broken_single_file_exits_non_zero_with_parse_error() {
+    // Ensure single-file syntax errors are visible and actionable to the caller.
+    let output = run_treebrief(&fixture_path("sample_project/src/python_broken.py"));
+    let (stdout, stderr) = decode_output(&output);
+
+    assert!(
+        !output.status.success(),
+        "broken file unexpectedly succeeded"
+    );
+    assert!(
+        stdout.is_empty(),
+        "broken single-file run should not print stdout"
+    );
+    assert_eq!(
+        stderr.trim_end(),
+        format!(
+            "parse failed for {}: syntax error near line 1, column 1",
+            fixture_display_path("sample_project/src/python_broken.py")
+        )
+    );
+}
+
+/// Verify that later syntax failures report stable line and column coordinates.
+#[test]
+fn later_broken_single_file_reports_precise_location() {
+    // Pin a non-trivial recovery shape so parse-location reporting cannot drift silently.
+    let output = run_treebrief(&fixture_path("broken/python_unexpected_token.py"));
+    let (stdout, stderr) = decode_output(&output);
+
+    assert!(
+        !output.status.success(),
+        "later broken file unexpectedly succeeded"
+    );
+    assert!(
+        stdout.is_empty(),
+        "later broken single-file run should not print stdout"
+    );
+    assert_eq!(
+        stderr.trim_end(),
+        format!(
+            "parse failed for {}: syntax error near line 6, column 5",
+            fixture_display_path("broken/python_unexpected_token.py")
+        )
+    );
 }
 
 /// Verify shebang detection and cwd independence for extensionless files.
