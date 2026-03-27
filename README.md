@@ -8,6 +8,7 @@ It is designed for fast codebase orientation:
 - every retained definition carries a line range
 - comments and docstrings are preserved generously
 - actual return statements are available with `--show-returns`
+- top-level assignment/constant blocks collapse by default and can be restored with `--show-top-level-symbols`
 - most ordinary executable code is omitted
 
 The output reads like reduced source, not metadata.
@@ -34,6 +35,7 @@ cargo run -- src/lib.rs
 cargo run -- .
 cargo run -- --show-line-numbers-for-all-items src/lib.rs
 cargo run -- --show-returns src/lib.rs
+cargo run -- --show-top-level-symbols src/lib.rs
 ```
 
 For a release-style local build:
@@ -70,6 +72,8 @@ Rules:
 - `--show-line-numbers-for-all-items` extends bracketed line numbers to all retained items
 - default output omits return-like control-flow lines
 - `--show-returns` restores actual `return` statements without restoring `raise`, `yield`, or `throw`
+- default output collapses adjacent top-level assignment/constant-style symbols into skipped-range markers
+- `--show-top-level-symbols` restores those top-level symbol definitions explicitly
 - files with no retained structure still emit a section with `(no retained structure)`
 
 ## Default Directory Ignore Rules
@@ -118,7 +122,7 @@ TreeBrief is intentionally a reduced-source mapper, not a semantic analyzer.
 
 Notable v1 constraints:
 
-- no filtering flags that change which structures are retained
+- no deep filtering or shaping controls beyond the small retained-surface flags above
 - no semantic resolution or type checking
 - no machine-readable output contract
 - no build-system awareness

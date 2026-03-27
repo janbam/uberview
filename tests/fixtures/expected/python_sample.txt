@@ -2,9 +2,7 @@
 
 """Python module docs."""
 # Module context that should stay.
-[5] Assignment: DEFAULT_NAME
-DEFAULT_NAME = "treebrief"
-
+[5] Skipped top-level assignments/constants (1 item)
 [8-21] Function: top_level
 @cache
 def top_level(

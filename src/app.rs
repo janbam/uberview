@@ -16,6 +16,7 @@ pub fn run(cli: Cli) -> Result<()> {
     };
     let extract_options = ExtractOptions {
         show_returns: cli.show_returns,
+        show_top_level_symbols: cli.show_top_level_symbols,
     };
 
     match resolve_input(&cli.path)? {

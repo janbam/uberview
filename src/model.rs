@@ -118,6 +118,8 @@ pub enum Item {
     Snippet(Snippet),
     /// A retained definition with its nested reduced-source body.
     Definition(Definition),
+    /// A synthetic placeholder for an omitted top-level symbol run.
+    SkippedRange(SkippedRange),
 }
 
 impl Item {
@@ -126,6 +128,7 @@ impl Item {
         match self {
             Self::Snippet(snippet) => snippet.span.start_byte,
             Self::Definition(definition) => definition.header_span.start_byte,
+            Self::SkippedRange(range) => range.span.start_byte,
         }
     }
 }
@@ -152,6 +155,17 @@ pub struct Definition {
     pub line_range: LineRange,
     /// The retained nested items inside the definition body.
     pub items: Vec<Item>,
+}
+
+/// A synthetic placeholder that keeps an omitted top-level symbol run visible in source order.
+#[derive(Debug)]
+pub struct SkippedRange {
+    /// The full source extent covered by the omitted run.
+    pub span: TextSpan,
+    /// The line coordinates shown in the placeholder prefix.
+    pub line_range: LineRange,
+    /// The number of omitted symbol definitions represented by the placeholder.
+    pub count: usize,
 }
 
 /// A rendered file result, including directory-scan failures that should not abort the run.

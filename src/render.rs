@@ -1,4 +1,6 @@
-use crate::model::{Definition, FileOutput, FileSection, Item, LineRange, Snippet, TextSpan};
+use crate::model::{
+    Definition, FileOutput, FileSection, Item, LineRange, SkippedRange, Snippet, TextSpan,
+};
 
 /// The user-facing rendering toggles that shape the reduced-source text output.
 #[derive(Clone, Copy, Debug, Default)]
@@ -56,6 +58,7 @@ fn render_item(
     match item {
         Item::Snippet(snippet) => render_snippet(snippet, section, options, lines),
         Item::Definition(definition) => render_definition(definition, section, options, lines),
+        Item::SkippedRange(range) => render_skipped_range(range, lines),
     }
 }
 
@@ -127,6 +130,18 @@ fn render_definition(
 
     // Separate whole definition blocks so adjacent structure does not visually collapse together.
     lines.push(String::new());
+}
+
+/// Render a synthetic placeholder for one omitted top-level symbol run.
+fn render_skipped_range(range: &SkippedRange, lines: &mut Vec<String>) {
+    let item_label = if range.count == 1 { "item" } else { "items" };
+
+    lines.push(format!(
+        "[{}] Skipped top-level assignments/constants ({} {})",
+        format_line_range(range.line_range),
+        range.count,
+        item_label
+    ));
 }
 
 /// Render any retained lines that were captured between the signature and the first named child.

@@ -48,7 +48,7 @@ It is a reliable structural map.
 - Build-system awareness
 - Project-root assumptions
 - Heavy configuration
-- Output filtering in v1
+- Deep filtering or shaping controls in v1
 - Replacing direct source reads entirely
 
 TreeBrief is meant to guide targeted source reads, not eliminate them.
@@ -62,7 +62,7 @@ JSON may exist internally or as an implementation aid, but it is not part of the
 ## CLI
 
 ```text
-treebrief [--show-line-numbers-for-all-items] [--show-returns] <path>
+treebrief [--show-line-numbers-for-all-items] [--show-returns] [--show-top-level-symbols] <path>
 ```
 
 Where:
@@ -73,7 +73,7 @@ Where:
 
 The default invocation must be enough for normal use.
 
-V1 may include small formatting toggles, but it should not depend on filtering or restricting flags such as depth limits.
+V1 may include a few small formatting or retained-surface toggles, but it should not depend on heavy filtering or restricting flags such as depth limits.
 
 ## Supported Languages
 
@@ -163,6 +163,8 @@ class ProposalService(BaseService):
 - `--show-line-numbers-for-all-items` extends bracketed line numbers to all retained snippets
 - Default output omits return-like control-flow lines
 - `--show-returns` restores actual `return` statements only
+- Default output collapses adjacent top-level assignment/constant-style symbols into skipped-range placeholders
+- `--show-top-level-symbols` restores those top-level symbol definitions explicitly
 - Non-definition retained lines are shown as source, not relabeled metadata
 - Do not print labels such as `header:`, `doc:`, `comment:`, or `return:`
 - Do not collapse multiline definitions into one line
@@ -207,6 +209,7 @@ Within each file, it should retain:
 - nearby comment blocks that plausibly describe a definition even if they are not in the language's canonical doc position
 - inline and block comments inside retained definitions
 - actual `return` statements inside retained definitions when `--show-returns` is enabled
+- top-level assignment and constant-style symbol definitions when `--show-top-level-symbols` is enabled
 
 It should omit:
 
@@ -214,6 +217,7 @@ It should omit:
 - import lists and use statements unless future versions explicitly decide otherwise
 - most local variable assignments
 - control flow bodies except for nested definitions, comments, and opt-in returns
+- top-level assignment and constant-style symbol runs by default, replacing each contiguous run with one skipped-range placeholder
 
 The result should resemble the source file with most non-structural code removed.
 
@@ -240,6 +244,18 @@ V1 should retain named structure-bearing constructs, including as applicable per
 The guiding rule is pragmatic:
 
 If a construct materially contributes to the visible structure of the file, it should appear.
+
+## Top-Level Symbol Suppression
+
+Large files often start with dense runs of assignment-style symbols that are structurally real but visually noisy.
+
+By default, TreeBrief should collapse each contiguous top-level run of assignment or constant-style symbol definitions into one placeholder line:
+
+- shape: `[start-end] Skipped top-level assignments/constants (N items)`
+- range: covers the first through last omitted symbol in the run
+- order: remains in source order relative to surrounding comments and retained definitions
+
+When `--show-top-level-symbols` is enabled, TreeBrief should restore the explicit symbol definitions instead of the placeholder line.
 
 ## What Counts As A Retained Comment Or Docstring
 
@@ -392,8 +408,9 @@ The tool is successful when all of the following are true:
 6. Nested definitions are indented and remain in source order.
 7. Comments and docstrings in slightly non-standard positions are still usually preserved.
 8. Default output omits return-like lines, and `--show-returns` restores actual returns only.
-9. Output is deterministic.
-10. Multiple concurrent runs do not interfere with each other.
+9. Default output collapses contiguous top-level assignment/constant-style symbol runs, and `--show-top-level-symbols` restores them explicitly.
+10. Output is deterministic.
+11. Multiple concurrent runs do not interfere with each other.
 
 ## Test Matrix
 
@@ -411,6 +428,7 @@ The test corpus must include at least:
 - comments inside functions
 - hidden-by-default `return`, `yield`, and `raise`
 - opt-in `return`
+- top-level assignment-run suppression and `--show-top-level-symbols`
 - intentionally misplaced but still nearby doc/comment blocks
 
 ### JavaScript And TypeScript
