@@ -19,6 +19,7 @@ pub struct Cli {
     #[arg(long)]
     pub show_top_level_symbols: bool,
     /// One or more files or directories to analyze.
+    /// Directory inputs render file headers relative to each provided root.
     #[arg(required = true)]
     pub paths: Vec<PathBuf>,
 }

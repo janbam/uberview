@@ -24,6 +24,14 @@ TreeBrief auto-detects languages by extension first, then filename patterns, the
 
 ## Install And Run
 
+For a quick scan from the repository root:
+
+```bash
+cargo run src
+```
+
+For explicit argument passthrough, especially when using TreeBrief flags:
+
 ```bash
 cargo run -- <path> [path...]
 ```
@@ -31,6 +39,7 @@ cargo run -- <path> [path...]
 Examples:
 
 ```bash
+cargo run src
 cargo run -- src/lib.rs
 cargo run -- .
 cargo run -- src/lib.rs src/app.rs
@@ -63,6 +72,8 @@ class Example:
 Rules:
 
 - file sections start with `=== <path> ===`
+- single-file invocations keep the path spelling you passed, except absolute paths under the current working directory are rendered relative to that directory
+- directory scans render paths relative to each scanned root, so `cargo run src` prints `=== app.rs ===` while `cargo run .` prints `=== src/app.rs ===`
 - each retained definition starts with `[start-end] Kind: name`
 - single-line definition ranges collapse to `[n]`
 - the retained signature and decorators stay below the synthetic header in source-like form
@@ -81,6 +92,7 @@ Rules:
 - one invocation may accept several file and directory roots
 - output follows the caller's root order, then deterministic in-root ordering
 - overlapping inputs are deduplicated so each file section appears once
+- multi-root and directory scans keep going after individual file failures and render `!! parse failed: ...` under the affected file header
 - files with no retained structure still emit a section with `(no retained structure)`
 
 ## Default Directory Ignore Rules
