@@ -6,16 +6,24 @@ use crate::cli::Cli;
 use crate::extract;
 use crate::fs::{InputTarget, discover_directory_files, resolve_input};
 use crate::model::{FileFailure, FileOutput};
-use crate::render;
+use crate::render::{self, RenderOptions};
 
 /// Run TreeBrief for the parsed CLI input.
 pub fn run(cli: Cli) -> Result<()> {
+    // Carry the CLI toggles once so both single-file and directory modes render consistently.
+    let render_options = RenderOptions {
+        show_line_numbers_for_all_items: cli.show_line_numbers_for_all_items,
+    };
+
     match resolve_input(&cli.path)? {
         InputTarget::File(file) => {
             // Fail the whole run for a single-file invocation so an empty output never hides an error.
             let source = std_fs::read_to_string(&file.actual_path)?;
             let section = extract::extract_file(file.display_path, source, file.language)?;
-            println!("{}", render::render_output(&FileOutput::Section(section)));
+            println!(
+                "{}",
+                render::render_output(&FileOutput::Section(section), render_options)
+            );
         }
         InputTarget::Directory(root) => {
             let files = discover_directory_files(&root)?;
@@ -47,7 +55,7 @@ pub fn run(cli: Cli) -> Result<()> {
                 })
                 .collect::<Vec<_>>();
 
-            println!("{}", render::render_outputs(&outputs));
+            println!("{}", render::render_outputs(&outputs, render_options));
         }
     }
 

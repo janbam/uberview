@@ -32,6 +32,7 @@ Examples:
 ```bash
 cargo run -- src/lib.rs
 cargo run -- .
+cargo run -- --show-line-numbers-for-all-items src/lib.rs
 ```
 
 For a release-style local build:
@@ -48,18 +49,25 @@ Each file becomes one section:
 ```text
 === src/example.py ===
 
-1-12	class Example:
+[1-12] Class: Example
+class Example:
     """Docs."""
-5-8	    def run(self) -> int:
+    [5-8] Method: run
+    def run(self) -> int:
         return 1
 ```
 
 Rules:
 
 - file sections start with `=== <path> ===`
-- definition headers are prefixed with `start-end<TAB>`
+- each retained definition starts with `[start-end] Kind: name`
+- single-line definition ranges collapse to `[n]`
+- the retained signature and decorators stay below the synthetic header in source-like form
+- retained definition blocks are separated by one blank line
 - retained content stays in source order
 - nested retained items keep their relative indentation
+- non-definition retained lines stay unnumbered by default
+- `--show-line-numbers-for-all-items` extends bracketed line numbers to all retained items
 - files with no retained structure still emit a section with `(no retained structure)`
 
 ## Default Directory Ignore Rules
@@ -107,7 +115,7 @@ TreeBrief is intentionally a reduced-source mapper, not a semantic analyzer.
 
 Notable v1 constraints:
 
-- no filtering flags or output shaping options
+- no filtering flags that change which structures are retained
 - no semantic resolution or type checking
 - no machine-readable output contract
 - no build-system awareness

@@ -33,6 +33,73 @@ pub struct LineRange {
     pub end: usize,
 }
 
+/// The structural label shown in a rendered definition header.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum DefinitionKind {
+    /// A Python-style assignment retained as structure.
+    Assignment,
+    /// A class-like container.
+    Class,
+    /// A constant or static item.
+    Constant,
+    /// An enum declaration.
+    Enum,
+    /// A field-like declaration.
+    Field,
+    /// A function-like declaration.
+    Function,
+    /// An implementation block.
+    Impl,
+    /// An interface declaration.
+    Interface,
+    /// A macro definition.
+    Macro,
+    /// A method-like declaration.
+    Method,
+    /// A module declaration.
+    Module,
+    /// A namespace declaration.
+    Namespace,
+    /// A property-like declaration.
+    Property,
+    /// A struct declaration.
+    Struct,
+    /// A trait declaration.
+    Trait,
+    /// A type-alias declaration.
+    TypeAlias,
+    /// A variable-like declaration.
+    Variable,
+    /// An enum variant.
+    Variant,
+}
+
+impl DefinitionKind {
+    /// Return the human-facing label used in rendered definition headers.
+    pub const fn label(self) -> &'static str {
+        match self {
+            Self::Assignment => "Assignment",
+            Self::Class => "Class",
+            Self::Constant => "Constant",
+            Self::Enum => "Enum",
+            Self::Field => "Field",
+            Self::Function => "Function",
+            Self::Impl => "Impl",
+            Self::Interface => "Interface",
+            Self::Macro => "Macro",
+            Self::Method => "Method",
+            Self::Module => "Module",
+            Self::Namespace => "Namespace",
+            Self::Property => "Property",
+            Self::Struct => "Struct",
+            Self::Trait => "Trait",
+            Self::TypeAlias => "Type Alias",
+            Self::Variable => "Variable",
+            Self::Variant => "Variant",
+        }
+    }
+}
+
 /// A source-ordered file section ready for rendering.
 #[derive(Debug)]
 pub struct FileSection {
@@ -73,6 +140,10 @@ pub struct Snippet {
 /// A retained definition with its line range, header, and nested items.
 #[derive(Debug)]
 pub struct Definition {
+    /// The structural label rendered in the synthetic header line.
+    pub kind: DefinitionKind,
+    /// The source-derived symbol name shown in the synthetic header line.
+    pub name: String,
     /// The full source extent of the definition.
     pub span: TextSpan,
     /// The source slice used for the retained header line(s).

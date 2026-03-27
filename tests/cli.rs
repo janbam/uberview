@@ -28,10 +28,15 @@ fn binary_path() -> &'static str {
 
 /// Run TreeBrief for one input path and capture the full process output.
 fn run_treebrief(path: &Path) -> Output {
-    Command::new(binary_path())
-        .arg(path)
-        .output()
-        .expect("failed to run treebrief")
+    run_treebrief_with_args(path, &[])
+}
+
+/// Run TreeBrief for one input path plus extra CLI flags.
+fn run_treebrief_with_args(path: &Path, args: &[&str]) -> Output {
+    // Build the command explicitly so flag-based contract tests hit the real binary surface.
+    let mut command = Command::new(binary_path());
+    command.args(args).arg(path);
+    command.output().expect("failed to run treebrief")
 }
 
 /// Run TreeBrief from a different working directory to verify cwd independence.
@@ -208,7 +213,43 @@ fn extensionless_python_file_works_from_other_cwd() {
     ));
 
     assert!(output.contains("#!/usr/bin/env python3"));
-    assert!(output.contains("5-7\tdef main() -> int:"));
+    assert!(output.contains("[5-7] Function: main"));
+}
+
+/// Verify that snippet numbering is opt-in and covers every retained item when enabled.
+#[test]
+fn show_line_numbers_for_all_items_numbers_snippets_too() {
+    // Exercise the CLI flag directly so non-definition numbering stays part of the public contract.
+    let output = successful_stdout(run_treebrief_with_args(
+        &fixture_path("sample_project/src/python_sample.py"),
+        &["--show-line-numbers-for-all-items"],
+    ));
+
+    assert!(output.contains("[1] \"\"\"Python module docs.\"\"\""));
+    assert!(output.contains("[3] # Module context that should stay."));
+    assert!(output.contains("    [12] \"\"\"Handle the top-level case.\"\"\""));
+    assert!(output.contains("    [15] # Leave the nested exit visible."));
+    assert!(output.contains("    [25] # Yield the normalized values."));
+    assert!(output.contains("        [16] return value + 1"));
+    assert!(output.contains("        [39] return [name.upper() for name in names]"));
+}
+
+/// Verify that decorated methods still read as methods instead of plain functions.
+#[test]
+fn decorated_python_method_keeps_method_label() {
+    // Pin the common `@classmethod` shape so method classification does not regress on wrapped defs.
+    let temp = tempdir().expect("failed to create temporary directory");
+    let file = temp.path().join("decorated_method.py");
+    std::fs::write(
+        &file,
+        "class Example:\n    @classmethod\n    def build(cls):\n        return cls()\n",
+    )
+    .expect("failed to write python fixture");
+
+    let output = successful_stdout(run_treebrief(&file));
+
+    assert!(output.contains("[1-4] Class: Example"));
+    assert!(output.contains("    [2-4] Method: build"));
 }
 
 /// Verify that concurrent invocations produce byte-identical results.

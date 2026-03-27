@@ -5,7 +5,7 @@ use anyhow::{Result, bail};
 use tree_sitter::{Node, Parser, Point};
 
 use crate::language::{self, LanguageKind};
-use crate::model::{Definition, FileSection, Item, LineRange, Snippet, TextSpan};
+use crate::model::{Definition, DefinitionKind, FileSection, Item, LineRange, Snippet, TextSpan};
 use crate::source::SourceText;
 
 /// Extract a rendered file section from one source file.
@@ -48,8 +48,12 @@ fn ensure_tree_has_no_syntax_errors(root: Node<'_>, display_path: &str) -> Resul
 }
 
 /// The extracted definition metadata needed to build the reduced internal model.
-#[derive(Clone, Copy)]
+#[derive(Clone)]
 struct DefinitionCapture<'tree> {
+    /// The user-facing structural kind attached to the definition.
+    kind: DefinitionKind,
+    /// The user-facing name attached to the definition.
+    name: String,
     /// The full source extent of the definition.
     span: TextSpan,
     /// The retained header slice emitted with the line-range prefix.
@@ -114,6 +118,9 @@ fn build_definition(
     let end = source.line_number_at(capture.span.end_byte.saturating_sub(1));
 
     Definition {
+        // Keep the header metadata fully source-derived so later rendering stays deterministic.
+        kind: capture.kind,
+        name: capture.name,
         span: capture.span,
         header_span: source.trim_trailing_line_breaks(capture.header_span),
         line_range: LineRange { start, end },
@@ -196,6 +203,17 @@ fn node_span(node: Node<'_>) -> TextSpan {
 /// Build a span from an explicit byte range.
 fn explicit_span(start_byte: usize, end_byte: usize) -> TextSpan {
     TextSpan::new(start_byte, end_byte)
+}
+
+/// Borrow one named child field as trimmed source text when available.
+fn child_field_text(node: Node<'_>, field_name: &str, source: &SourceText) -> Option<String> {
+    node.child_by_field_name(field_name)
+        .map(|child| trimmed_node_text(source, child))
+}
+
+/// Borrow one syntax node as trimmed source text.
+fn trimmed_node_text(source: &SourceText, node: Node<'_>) -> String {
+    source.span_text(node_span(node)).trim().to_owned()
 }
 
 /// Find the first concrete syntax issue inside a recovered tree.

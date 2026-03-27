@@ -61,7 +61,7 @@ JSON may exist internally or as an implementation aid, but it is not part of the
 ## CLI
 
 ```text
-treebrief <path>
+treebrief [--show-line-numbers-for-all-items] <path>
 ```
 
 Where:
@@ -72,7 +72,7 @@ Where:
 
 The default invocation must be enough for normal use.
 
-There should be no filtering or restricting flags such as depth limits in v1.
+V1 may include small formatting toggles, but it should not depend on filtering or restricting flags such as depth limits.
 
 ## Supported Languages
 
@@ -133,29 +133,35 @@ Example:
 
 """Proposal orchestration helpers."""
 
-12-148	class ProposalService(BaseService):
-        """Coordinates proposal creation and application."""
+[12-148] Class: ProposalService
+class ProposalService(BaseService):
+    """Coordinates proposal creation and application."""
 
-85-131	    def create_task_create_proposal(
-            title: str,
-            due_at: datetime | None,
-        ) -> Proposal:
-            """Create and store a pending task-creation proposal."""
-            # Capture duplicate-title context before apply.
-            return proposal
+    [85-131] Method: create_task_create_proposal
+    def create_task_create_proposal(
+        title: str,
+        due_at: datetime | None,
+    ) -> Proposal:
+        """Create and store a pending task-creation proposal."""
+        # Capture duplicate-title context before apply.
+        return proposal
 
-109-116	        def normalize_title(title: str) -> str:
-                return normalized
+        [109-116] Function: normalize_title
+        def normalize_title(title: str) -> str:
+            return normalized
 ```
 
 ### Formatting Rules
 
 - File sections start with `=== <relative-path> ===`
 - Output inside a file is strictly in source order
-- Every definition line starts with `start-end<TAB>`
-- The source text of the definition follows the tab
-- Nested definitions are indented after the tab
+- Every retained definition block starts with `[start-end] Kind: name`
+- Single-line ranges collapse to `[n]`
+- Nested definition headers keep their source indentation
+- The retained signature and decorators follow the synthetic header as source text
+- One blank line follows each retained definition block
 - Non-definition retained lines do not carry line numbers by default
+- `--show-line-numbers-for-all-items` extends bracketed line numbers to all retained snippets
 - Non-definition retained lines are shown as source, not relabeled metadata
 - Do not print labels such as `header:`, `doc:`, `comment:`, or `return:`
 - Do not collapse multiline definitions into one line
@@ -179,7 +185,11 @@ This applies to:
 - type aliases
 - top-level constants and similar named declarations when they are retained as definitions
 
+Definition line ranges render in bracketed form such as `[12-148]`.
+Single-line definition ranges collapse to `[12]`.
+
 Non-definition lines such as comments, docstrings, and exits do not need line numbers in the default output.
+When `--show-line-numbers-for-all-items` is enabled, retained snippets should use the same bracketed range format.
 
 The line ranges are the main coordinate system that let an AI perform targeted follow-up reads.
 
@@ -434,7 +444,7 @@ The test corpus must include at least:
 Possible future extensions, but explicitly not required for v1:
 
 - optional machine-readable output
-- optional per-comment and per-exit line numbers
+- finer-grained line-number controls
 - import and dependency surface retention
 - language support beyond the initial four
 - editor integration
