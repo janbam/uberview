@@ -26,8 +26,13 @@ pub enum InputTarget {
     Directory(PathBuf),
 }
 
+/// Resolve every user-provided input in order.
+pub fn resolve_inputs(paths: &[PathBuf]) -> Result<Vec<InputTarget>> {
+    paths.iter().map(|path| resolve_input(path)).collect()
+}
+
 /// Resolve the user-provided path into either a single file target or a directory scan root.
-pub fn resolve_input(path: &Path) -> Result<InputTarget> {
+fn resolve_input(path: &Path) -> Result<InputTarget> {
     // Resolve relative inputs once so later file IO is independent of the caller's cwd.
     let actual_path = if path.is_absolute() {
         path.to_path_buf()
