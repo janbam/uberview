@@ -326,6 +326,41 @@ fn mixed_file_and_directory_inputs_keep_order_without_duplicates() {
     );
 }
 
+/// Verify that normalized-equivalent input spellings still deduplicate to one concrete file.
+#[test]
+fn normalized_file_input_deduplicates_against_later_directory_root() {
+    // Collapse spelling-only path differences so `..` segments cannot reintroduce duplicate sections.
+    let odd_spelling = PathBuf::from("tests/fixtures/sample_project/src/../src/python_sample.py");
+    let directory = PathBuf::from("tests/fixtures/sample_project");
+    let output = successful_stdout(
+        Command::new(binary_path())
+            .current_dir(env!("CARGO_MANIFEST_DIR"))
+            .arg(&odd_spelling)
+            .arg(&directory)
+            .output()
+            .expect("failed to run treebrief with normalized-equivalent inputs"),
+    );
+
+    assert_in_order(
+        &output,
+        &[
+            "=== tests/fixtures/sample_project/src/../src/python_sample.py ===",
+            "=== scripts/python_tool ===",
+            "=== src/javascript_sample.js ===",
+            "=== src/python_broken.py ===",
+            "=== src/rust_sample.rs ===",
+            "=== src/typescript_sample.ts ===",
+        ],
+    );
+    assert_eq!(
+        output
+            .matches("=== tests/fixtures/sample_project/src/../src/python_sample.py ===")
+            .count(),
+        1
+    );
+    assert!(!output.contains("=== src/python_sample.py ==="));
+}
+
 /// Verify that overlapping directory roots contribute unique files in root order.
 #[test]
 fn overlapping_directory_roots_keep_stable_unique_order() {

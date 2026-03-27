@@ -34,7 +34,7 @@ pub fn resolve_inputs(paths: &[PathBuf]) -> Result<Vec<InputTarget>> {
 /// Resolve the user-provided path into either a single file target or a directory scan root.
 fn resolve_input(path: &Path) -> Result<InputTarget> {
     // Resolve relative inputs once so later file IO is independent of the caller's cwd.
-    let actual_path = if path.is_absolute() {
+    let requested_path = if path.is_absolute() {
         path.to_path_buf()
     } else {
         std::env::current_dir()
@@ -42,8 +42,14 @@ fn resolve_input(path: &Path) -> Result<InputTarget> {
             .join(path)
     };
 
-    let metadata = fs::metadata(&actual_path)
-        .with_context(|| format!("failed to inspect {}", actual_path.to_string_lossy()))?;
+    let metadata = fs::metadata(&requested_path)
+        .with_context(|| format!("failed to inspect {}", requested_path.to_string_lossy()))?;
+    let actual_path = fs::canonicalize(&requested_path).with_context(|| {
+        format!(
+            "failed to canonicalize {}",
+            requested_path.to_string_lossy()
+        )
+    })?;
 
     if metadata.is_dir() {
         return Ok(InputTarget::Directory(actual_path));
