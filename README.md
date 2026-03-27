@@ -7,7 +7,7 @@ It is designed for fast codebase orientation:
 - definitions keep their original source order
 - every retained definition carries a line range
 - comments and docstrings are preserved generously
-- explicit exits stay visible
+- actual return statements are available with `--show-returns`
 - most ordinary executable code is omitted
 
 The output reads like reduced source, not metadata.
@@ -33,6 +33,7 @@ Examples:
 cargo run -- src/lib.rs
 cargo run -- .
 cargo run -- --show-line-numbers-for-all-items src/lib.rs
+cargo run -- --show-returns src/lib.rs
 ```
 
 For a release-style local build:
@@ -54,7 +55,6 @@ class Example:
     """Docs."""
     [5-8] Method: run
     def run(self) -> int:
-        return 1
 ```
 
 Rules:
@@ -68,6 +68,8 @@ Rules:
 - nested retained items keep their relative indentation
 - non-definition retained lines stay unnumbered by default
 - `--show-line-numbers-for-all-items` extends bracketed line numbers to all retained items
+- default output omits return-like control-flow lines
+- `--show-returns` restores actual `return` statements without restoring `raise`, `yield`, or `throw`
 - files with no retained structure still emit a section with `(no retained structure)`
 
 ## Default Directory Ignore Rules
@@ -100,6 +102,7 @@ The test suite includes:
 - exact single-file output snapshots for all supported languages
 - deterministic directory-scan assertions
 - shebang detection for extensionless scripts
+- opt-in return-surface assertions
 - syntax-recovery coverage
 - concurrent end-to-end execution checks
 

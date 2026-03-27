@@ -8,11 +8,19 @@ use crate::language::{self, LanguageKind};
 use crate::model::{Definition, DefinitionKind, FileSection, Item, LineRange, Snippet, TextSpan};
 use crate::source::SourceText;
 
+/// The extraction toggles that control which retained source surfaces are emitted.
+#[derive(Clone, Copy, Debug, Default)]
+pub struct ExtractOptions {
+    /// Surface actual `return` statements when the caller explicitly asks for them.
+    pub show_returns: bool,
+}
+
 /// Extract a rendered file section from one source file.
 pub fn extract_file(
     display_path: String,
     source: String,
     language: LanguageKind,
+    options: ExtractOptions,
 ) -> Result<FileSection> {
     // Parse once up front so the extraction pass can stay purely structural.
     let source = SourceText::new(source);
@@ -21,7 +29,7 @@ pub fn extract_file(
     let tree = language::parse_source(&mut parser, source.as_str())?;
     let root = tree.root_node();
     ensure_tree_has_no_syntax_errors(root, &display_path)?;
-    let items = collect_items(root, language, &source);
+    let items = collect_items(root, language, &source, options);
 
     Ok(FileSection {
         display_path,
@@ -63,9 +71,14 @@ struct DefinitionCapture<'tree> {
 }
 
 /// Collect retained items under a scope node in strict source order.
-fn collect_items(scope: Node<'_>, language: LanguageKind, source: &SourceText) -> Vec<Item> {
+fn collect_items(
+    scope: Node<'_>,
+    language: LanguageKind,
+    source: &SourceText,
+    options: ExtractOptions,
+) -> Vec<Item> {
     let mut items = Vec::new();
-    walk_children(scope, language, source, &mut items);
+    walk_children(scope, language, source, options, &mut items);
     dedupe_items(items)
 }
 
@@ -74,6 +87,7 @@ fn walk_children(
     scope: Node<'_>,
     language: LanguageKind,
     source: &SourceText,
+    options: ExtractOptions,
     items: &mut Vec<Item>,
 ) {
     let mut cursor = scope.walk();
@@ -89,18 +103,18 @@ fn walk_children(
 
         if let Some(capture) = capture_definition(language, child, source) {
             items.push(Item::Definition(build_definition(
-                capture, language, source,
+                capture, language, source, options,
             )));
             continue;
         }
 
-        if let Some(span) = capture_snippet(language, child) {
+        if let Some(span) = capture_snippet(language, child, options) {
             items.push(Item::Snippet(Snippet { span }));
             continue;
         }
 
-        // Keep descending through omitted scaffolding so nested definitions, comments, and exits survive.
-        walk_children(child, language, source, items);
+        // Keep descending through omitted scaffolding so nested definitions, comments, and opt-in returns survive.
+        walk_children(child, language, source, options, items);
     }
 }
 
@@ -109,10 +123,11 @@ fn build_definition(
     capture: DefinitionCapture<'_>,
     language: LanguageKind,
     source: &SourceText,
+    options: ExtractOptions,
 ) -> Definition {
     let items = capture
         .body
-        .map(|body| collect_items(body, language, source))
+        .map(|body| collect_items(body, language, source, options))
         .unwrap_or_default();
     let start = source.line_number_at(capture.header_span.start_byte);
     let end = source.line_number_at(capture.span.end_byte.saturating_sub(1));
@@ -163,13 +178,17 @@ fn capture_definition<'tree>(
 }
 
 /// Dispatch retained snippet capture to the active language adapter.
-fn capture_snippet(language: LanguageKind, node: Node<'_>) -> Option<TextSpan> {
+fn capture_snippet(
+    language: LanguageKind,
+    node: Node<'_>,
+    options: ExtractOptions,
+) -> Option<TextSpan> {
     match language {
-        LanguageKind::Python => python::capture_snippet(node),
+        LanguageKind::Python => python::capture_snippet(node, options),
         LanguageKind::JavaScript | LanguageKind::TypeScript | LanguageKind::Tsx => {
-            javascript::capture_snippet(node)
+            javascript::capture_snippet(node, options)
         }
-        LanguageKind::Rust => rust::capture_snippet(node),
+        LanguageKind::Rust => rust::capture_snippet(node, options),
     }
 }
 

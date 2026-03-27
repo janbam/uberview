@@ -17,7 +17,8 @@ The output should feel like:
 
 - the original source code
 - with most executable code removed
-- but with definitions, comments, docstrings, and exits preserved
+- but with definitions, comments, and docstrings preserved
+- and with actual `return` statements available on demand
 - and with line ranges on every definition so the AI can do targeted follow-up reads
 
 This is not a semantic analysis tool.
@@ -36,7 +37,7 @@ It is a reliable structural map.
 - Always show line ranges for definitions
 - Preserve multiline definitions instead of truncating them
 - Preserve docstrings and comments even when they are in slightly non-standard places
-- Preserve explicit exits such as `return`, `yield`, `raise`, and `throw`
+- Surface actual `return` statements when explicitly requested
 - Be fast, deterministic, and safe to run in parallel
 - Work from any current working directory
 
@@ -61,7 +62,7 @@ JSON may exist internally or as an implementation aid, but it is not part of the
 ## CLI
 
 ```text
-treebrief [--show-line-numbers-for-all-items] <path>
+treebrief [--show-line-numbers-for-all-items] [--show-returns] <path>
 ```
 
 Where:
@@ -144,11 +145,9 @@ class ProposalService(BaseService):
     ) -> Proposal:
         """Create and store a pending task-creation proposal."""
         # Capture duplicate-title context before apply.
-        return proposal
 
         [109-116] Function: normalize_title
         def normalize_title(title: str) -> str:
-            return normalized
 ```
 
 ### Formatting Rules
@@ -162,6 +161,8 @@ class ProposalService(BaseService):
 - One blank line follows each retained definition block
 - Non-definition retained lines do not carry line numbers by default
 - `--show-line-numbers-for-all-items` extends bracketed line numbers to all retained snippets
+- Default output omits return-like control-flow lines
+- `--show-returns` restores actual `return` statements only
 - Non-definition retained lines are shown as source, not relabeled metadata
 - Do not print labels such as `header:`, `doc:`, `comment:`, or `return:`
 - Do not collapse multiline definitions into one line
@@ -188,7 +189,7 @@ This applies to:
 Definition line ranges render in bracketed form such as `[12-148]`.
 Single-line definition ranges collapse to `[12]`.
 
-Non-definition lines such as comments, docstrings, and exits do not need line numbers in the default output.
+Non-definition lines such as comments and docstrings do not need line numbers in the default output.
 When `--show-line-numbers-for-all-items` is enabled, retained snippets should use the same bracketed range format.
 
 The line ranges are the main coordinate system that let an AI perform targeted follow-up reads.
@@ -205,14 +206,14 @@ Within each file, it should retain:
 - docstrings and doc comments attached to definitions
 - nearby comment blocks that plausibly describe a definition even if they are not in the language's canonical doc position
 - inline and block comments inside retained definitions
-- exit statements inside retained definitions
+- actual `return` statements inside retained definitions when `--show-returns` is enabled
 
 It should omit:
 
-- ordinary executable statements that are not exits
+- ordinary executable statements that are not retained comments or opt-in returns
 - import lists and use statements unless future versions explicitly decide otherwise
 - most local variable assignments
-- control flow bodies except for nested definitions, comments, and exits
+- control flow bodies except for nested definitions, comments, and opt-in returns
 
 The result should resemble the source file with most non-structural code removed.
 
@@ -265,22 +266,27 @@ But also:
 
 When attribution is ambiguous, preserve the comment in source order instead of pretending it belongs to the wrong symbol.
 
-## Exit Surface
+## Return Surface
 
-Inside retained definitions, TreeBrief should preserve exit-like lines because they often summarize behavior.
+Inside retained definitions, TreeBrief should omit return-like control-flow lines by default so the reduced output stays focused on structure.
 
-V1 should retain:
+When `--show-returns` is enabled, V1 should retain:
 
-- `return`
+- actual `return` statements in Python, JavaScript, TypeScript, and Rust
+- nested and early `return` statements in source order
+
+V1 should not treat any of these as returns:
+
+- `raise`
 - `yield`
 - `yield from`
-- `raise`
 - `throw`
-- Rust tail expressions when they clearly act as the function's return value
+- Rust `?` expressions
+- Rust implicit tail expressions
 
-If an exit statement spans multiple lines, emit the full statement in source form.
+If a retained `return` statement spans multiple lines, emit the full statement in source form.
 
-Exits must remain in source order relative to surrounding comments and nested definitions.
+Retained `return` statements must remain in source order relative to surrounding comments and nested definitions.
 
 ## Source Preservation
 
@@ -288,7 +294,7 @@ Retained source should stay as close as practical to the original file.
 
 That means:
 
-- preserve original token text for comments, docstrings, and exits
+- preserve original token text for comments, docstrings, and retained returns
 - preserve multiline definitions as written
 - preserve nesting and relative indentation
 
@@ -351,7 +357,7 @@ Retained source fragments should be enough to render:
 - definition header lines
 - docstrings
 - comment blocks
-- exit statements
+- opt-in return statements
 
 The model should stay close to source slices rather than inventing a rich abstract schema too early.
 
@@ -385,7 +391,7 @@ The tool is successful when all of the following are true:
 5. Multiline definitions are preserved instead of truncated.
 6. Nested definitions are indented and remain in source order.
 7. Comments and docstrings in slightly non-standard positions are still usually preserved.
-8. Exit lines are preserved.
+8. Default output omits return-like lines, and `--show-returns` restores actual returns only.
 9. Output is deterministic.
 10. Multiple concurrent runs do not interfere with each other.
 
@@ -403,7 +409,8 @@ The test corpus must include at least:
 - async function
 - decorators
 - comments inside functions
-- `return`, `yield`, and `raise`
+- hidden-by-default `return`, `yield`, and `raise`
+- opt-in `return`
 - intentionally misplaced but still nearby doc/comment blocks
 
 ### JavaScript And TypeScript
@@ -416,7 +423,8 @@ The test corpus must include at least:
 - multiline signatures
 - JSDoc above definitions
 - body comments
-- `return` and `throw`
+- hidden-by-default `return` and `throw`
+- opt-in `return`
 - nested functions and closures
 
 ### Rust
@@ -429,7 +437,8 @@ The test corpus must include at least:
 - multiline `where` clauses
 - doc comments
 - body comments
-- `return`, `?`, explicit and implicit tail-expression returns
+- hidden-by-default `return`, `?`, and implicit tail-expression returns
+- opt-in explicit `return`
 
 ### Cross-Cutting
 
@@ -458,6 +467,6 @@ The core contract is simple:
 - every meaningful definition appears
 - every definition has a line range
 - comments and docstrings are preserved generously
-- exits are preserved
+- return statements are opt-in and limited to actual `return` statements
 - everything stays in source order
 - the result reads like source with most code removed

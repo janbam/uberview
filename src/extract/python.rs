@@ -3,7 +3,10 @@ use tree_sitter::Node;
 use crate::model::{DefinitionKind, TextSpan};
 use crate::source::SourceText;
 
-use super::{DefinitionCapture, child_field_text, explicit_span, node_span, trimmed_node_text};
+use super::{
+    DefinitionCapture, ExtractOptions, child_field_text, explicit_span, node_span,
+    trimmed_node_text,
+};
 
 /// Capture one Python definition if the node contributes structural surface area.
 pub fn capture_definition<'tree>(
@@ -53,15 +56,12 @@ pub fn capture_definition<'tree>(
     }
 }
 
-/// Capture one retained Python snippet such as a comment, docstring, or exit surface.
-pub fn capture_snippet(node: Node<'_>) -> Option<TextSpan> {
+/// Capture one retained Python snippet such as a comment, docstring, or opt-in return.
+pub fn capture_snippet(node: Node<'_>, options: ExtractOptions) -> Option<TextSpan> {
     match node.kind() {
-        "comment" | "return_statement" | "raise_statement" => Some(node_span(node)),
-        "expression_statement"
-            if is_docstring_statement(node) || statement_contains_yield(node) =>
-        {
-            Some(node_span(node))
-        }
+        "comment" => Some(node_span(node)),
+        "return_statement" if options.show_returns => Some(node_span(node)),
+        "expression_statement" if is_docstring_statement(node) => Some(node_span(node)),
         _ => None,
     }
 }
@@ -147,23 +147,6 @@ fn assignment_name(node: Node<'_>, source: &SourceText) -> Option<String> {
 
     node.named_child(0)
         .map(|child| trimmed_node_text(source, child))
-}
-
-/// Decide whether a statement contains a `yield` or `yield from` exit surface.
-fn statement_contains_yield(node: Node<'_>) -> bool {
-    let mut cursor = node.walk();
-
-    for child in node.children(&mut cursor) {
-        if matches!(child.kind(), "yield" | "yield_from") {
-            return true;
-        }
-
-        if child.is_named() && statement_contains_yield(child) {
-            return true;
-        }
-    }
-
-    false
 }
 
 /// Decide whether an assignment sits at module scope and should be surfaced as structure.

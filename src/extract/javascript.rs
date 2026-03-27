@@ -5,7 +5,7 @@ use crate::model::{DefinitionKind, TextSpan};
 use crate::source::SourceText;
 
 use super::{
-    DefinitionCapture, body_header_end, child_field_text, explicit_span, node_span,
+    DefinitionCapture, ExtractOptions, body_header_end, child_field_text, explicit_span, node_span,
     trimmed_node_text,
 };
 
@@ -42,9 +42,10 @@ pub fn capture_definition<'tree>(
 }
 
 /// Capture one retained JavaScript or TypeScript snippet.
-pub fn capture_snippet(node: Node<'_>) -> Option<TextSpan> {
+pub fn capture_snippet(node: Node<'_>, options: ExtractOptions) -> Option<TextSpan> {
     match node.kind() {
-        "comment" | "return_statement" | "throw_statement" => Some(node_span(node)),
+        "comment" => Some(node_span(node)),
+        "return_statement" if options.show_returns => Some(node_span(node)),
         _ => None,
     }
 }

@@ -15,15 +15,11 @@ def top_level(
     [14-16] Function: nested
     def nested(value: int) -> int:
         # Leave the nested exit visible.
-        return value + 1
 
-        raise ValueError("negative")
-    return nested(value)
 
 [24-27] Function: stream_names
 def stream_names(names: list[str]):
     # Yield the normalized values.
-        yield name.upper()
 
 [30-39] Class: Greeter
 class Greeter:
@@ -35,4 +31,3 @@ class Greeter:
     ) -> list[str]:
         """Format several names."""
         # Keep the final result visible.
-        return [name.upper() for name in names]

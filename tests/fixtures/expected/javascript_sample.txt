@@ -7,9 +7,7 @@ export function greet(name) {
   /** Normalize before returning. */
   [6-8] Function: normalize
   function normalize(value) {
-    return value.trim();
 
-  return normalize(name);
 
 /** Builder docs. */
 [14-23] Function: buildGreeter
@@ -17,8 +15,6 @@ export const buildGreeter = (
   prefix,
 ) => {
   // Reject empty prefixes.
-    throw new Error("missing prefix");
-  return (name) => `${prefix}: ${name}`;
 
 [25-31] Class: Greeter
 class Greeter {
@@ -26,4 +22,3 @@ class Greeter {
   [27-30] Method: format
   format(name) {
     // Keep the method exit.
-    return `${name}!`;
