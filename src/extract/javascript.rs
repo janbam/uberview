@@ -97,23 +97,31 @@ fn capture_variable_definition<'tree>(
             | "generator_function"
             | "class"
             | "class_declaration"
-    ) {
-        if let Some(body) = value.child_by_field_name("body") {
-            if value.kind() == "arrow_function" && body.kind() != "statement_block" {
-                return Some(DefinitionCapture {
-                    span: node_span(node),
-                    header_span: node_span(node),
-                    body: None,
-                });
-            }
-
+    ) && let Some(body) = value.child_by_field_name("body")
+    {
+        if value.kind() == "arrow_function" && body.kind() != "statement_block" {
             return Some(DefinitionCapture {
                 span: node_span(node),
-                header_span: explicit_span(node.start_byte(), body_header_end(source, body)),
-                body: Some(body),
+                header_span: node_span(node),
+                body: None,
             });
         }
 
+        return Some(DefinitionCapture {
+            span: node_span(node),
+            header_span: explicit_span(node.start_byte(), body_header_end(source, body)),
+            body: Some(body),
+        });
+    }
+
+    if matches!(
+        value.kind(),
+        "arrow_function"
+            | "function_expression"
+            | "generator_function"
+            | "class"
+            | "class_declaration"
+    ) {
         return Some(DefinitionCapture {
             span: node_span(node),
             header_span: node_span(node),
@@ -185,14 +193,13 @@ fn capture_object_pair_definition<'tree>(
     if matches!(
         value.kind(),
         "arrow_function" | "function_expression" | "generator_function"
-    ) {
-        if let Some(body) = value.child_by_field_name("body") {
-            return Some(DefinitionCapture {
-                span: node_span(node),
-                header_span: explicit_span(node.start_byte(), body_header_end(source, body)),
-                body: Some(body),
-            });
-        }
+    ) && let Some(body) = value.child_by_field_name("body")
+    {
+        return Some(DefinitionCapture {
+            span: node_span(node),
+            header_span: explicit_span(node.start_byte(), body_header_end(source, body)),
+            body: Some(body),
+        });
     }
 
     None

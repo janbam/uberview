@@ -85,6 +85,8 @@ cargo clippy --all-targets -- -D warnings
 cargo test
 ```
 
+The repository pins Rust `1.88.0` via [`rust-toolchain.toml`](/home/jan/work/treebrief/rust-toolchain.toml) so local runs and CI use the same lint and formatting surface.
+
 The test suite includes:
 
 - exact single-file output snapshots for all supported languages

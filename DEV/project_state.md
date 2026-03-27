@@ -7,6 +7,7 @@
 - Repository contents at start: `.git/`, `DEV/`, and `DEV/SPEC.md`.
 - GitHub CLI is authenticated for `yannbam`; a remote-backed milestone loop is available if needed.
 - The implementation is now complete on branch `feat/core-extraction`.
+- The repository toolchain is pinned to Rust `1.88.0` for local/CI parity.
 - Final verification completed successfully:
   - `cargo fmt --check`
   - `cargo clippy --all-targets -- -D warnings`
