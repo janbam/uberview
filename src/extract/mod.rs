@@ -5,7 +5,9 @@ use anyhow::{Result, bail};
 use tree_sitter::{Node, Parser, Point};
 
 use crate::language::{self, LanguageKind};
-use crate::model::{Definition, DefinitionKind, FileSection, Item, LineRange, Snippet, TextSpan};
+use crate::model::{
+    Definition, DefinitionKind, FileSection, Item, LineRange, SkippedRange, Snippet, TextSpan,
+};
 use crate::source::SourceText;
 
 /// The extraction toggles that control which retained source surfaces are emitted.
@@ -13,6 +15,8 @@ use crate::source::SourceText;
 pub struct ExtractOptions {
     /// Surface actual `return` statements when the caller explicitly asks for them.
     pub show_returns: bool,
+    /// Restore explicit top-level symbol definitions instead of collapsing them into placeholders.
+    pub show_top_level_symbols: bool,
 }
 
 /// Extract a rendered file section from one source file.
@@ -30,6 +34,11 @@ pub fn extract_file(
     let root = tree.root_node();
     ensure_tree_has_no_syntax_errors(root, &display_path)?;
     let items = collect_items(root, language, &source, options);
+    let items = if options.show_top_level_symbols {
+        items
+    } else {
+        collapse_top_level_symbols(items, &source)
+    };
 
     Ok(FileSection {
         display_path,
@@ -162,6 +171,80 @@ fn dedupe_items(items: Vec<Item>) -> Vec<Item> {
     deduped
 }
 
+/// Collapse adjacent top-level assignment-like definitions into one synthetic placeholder run.
+fn collapse_top_level_symbols(items: Vec<Item>, source: &SourceText) -> Vec<Item> {
+    let mut collapsed = Vec::new();
+    let mut items = items.into_iter().map(Some).collect::<Vec<_>>();
+    let mut index = 0;
+
+    while index < items.len() {
+        if !belongs_to_skipped_symbol_run(&items, index, source) {
+            if let Some(item) = items[index].take() {
+                collapsed.push(item);
+            }
+
+            index += 1;
+            continue;
+        }
+
+        let mut run: Option<SkippedSymbolRun> = None;
+
+        while index < items.len() && belongs_to_skipped_symbol_run(&items, index, source) {
+            let Some(item) = items[index].take() else {
+                index += 1;
+                continue;
+            };
+
+            if let Item::Definition(definition) = item {
+                run = Some(match run {
+                    Some(mut run) => {
+                        run.extend(definition, source);
+                        run
+                    }
+                    None => SkippedSymbolRun::new(definition, source),
+                });
+            }
+
+            index += 1;
+        }
+
+        if let Some(run) = run {
+            collapsed.push(Item::SkippedRange(run.finish()));
+        }
+    }
+
+    collapsed
+}
+
+/// Decide whether a top-level definition should be hidden behind a symbol placeholder by default.
+fn should_skip_top_level_symbol(definition: &Definition) -> bool {
+    matches!(
+        definition.kind,
+        DefinitionKind::Assignment | DefinitionKind::Constant | DefinitionKind::Variable
+    )
+}
+
+/// Decide whether an item should be absorbed into the current skipped top-level symbol run.
+fn belongs_to_skipped_symbol_run(
+    items: &[Option<Item>],
+    index: usize,
+    source: &SourceText,
+) -> bool {
+    let Some(item) = items.get(index).and_then(|item| item.as_ref()) else {
+        return false;
+    };
+
+    match item {
+        Item::Definition(definition) => should_skip_top_level_symbol(definition),
+        Item::Snippet(snippet) => {
+            is_symbol_attached_comment_snippet(source, *snippet)
+                && (comment_adjoins_skipped_symbol(items, index, source, -1)
+                    || comment_adjoins_skipped_symbol(items, index, source, 1))
+        }
+        Item::SkippedRange(_) => false,
+    }
+}
+
 /// Dispatch definition capture to the active language adapter.
 fn capture_definition<'tree>(
     language: LanguageKind,
@@ -233,6 +316,110 @@ fn child_field_text(node: Node<'_>, field_name: &str, source: &SourceText) -> Op
 /// Borrow one syntax node as trimmed source text.
 fn trimmed_node_text(source: &SourceText, node: Node<'_>) -> String {
     source.span_text(node_span(node)).trim().to_owned()
+}
+
+/// Decide whether a top-level snippet reads like a symbol-attached doc comment.
+fn is_symbol_attached_comment_snippet(source: &SourceText, snippet: Snippet) -> bool {
+    let text = source.span_text(source.trim_trailing_line_breaks(snippet.span));
+    let trimmed = text.trim_start();
+
+    trimmed.starts_with("#:")
+        || trimmed.starts_with("///")
+        || trimmed.starts_with("//!")
+        || trimmed.starts_with("/**")
+}
+
+/// Decide whether a comment snippet sits flush against a skipped symbol definition on one side.
+fn comment_adjoins_skipped_symbol(
+    items: &[Option<Item>],
+    index: usize,
+    source: &SourceText,
+    direction: isize,
+) -> bool {
+    let Some(Item::Snippet(snippet)) = items.get(index).and_then(|item| item.as_ref()) else {
+        return false;
+    };
+    let comment_lines = snippet_line_range(source, *snippet);
+    let Some(other_index) = offset_index(index, direction) else {
+        return false;
+    };
+    let Some(Item::Definition(definition)) = items.get(other_index).and_then(|item| item.as_ref())
+    else {
+        return false;
+    };
+
+    if !should_skip_top_level_symbol(definition) {
+        return false;
+    }
+
+    if direction < 0 {
+        return definition.line_range.end + 1 == comment_lines.start;
+    }
+
+    comment_lines.end + 1 == definition.line_range.start
+}
+
+/// Convert one snippet into the line range used for adjacency checks.
+fn snippet_line_range(source: &SourceText, snippet: Snippet) -> LineRange {
+    LineRange {
+        start: source.line_number_at(snippet.span.start_byte),
+        end: source.line_number_at(snippet.span.end_byte.saturating_sub(1)),
+    }
+}
+
+/// Offset one index by a signed step, returning `None` when it would underflow or overflow.
+fn offset_index(index: usize, direction: isize) -> Option<usize> {
+    if direction < 0 {
+        return index.checked_sub(direction.unsigned_abs());
+    }
+
+    index.checked_add(direction as usize)
+}
+
+/// The mutable state used while consolidating one skipped top-level symbol run.
+struct SkippedSymbolRun {
+    /// The first retained byte covered by the run.
+    start_byte: usize,
+    /// The first line covered by the run.
+    start_line: usize,
+    /// The latest retained end byte covered by the run.
+    end_byte: usize,
+    /// The latest line covered by the run.
+    end_line: usize,
+    /// The number of omitted symbol definitions in the run.
+    count: usize,
+}
+
+impl SkippedSymbolRun {
+    /// Start a new skipped run from one top-level symbol definition.
+    fn new(definition: Definition, source: &SourceText) -> Self {
+        Self {
+            start_byte: definition.header_span.start_byte,
+            start_line: definition.line_range.start,
+            end_byte: definition.span.end_byte,
+            end_line: source.line_number_at(definition.span.end_byte.saturating_sub(1)),
+            count: 1,
+        }
+    }
+
+    /// Extend the run across one more adjacent top-level symbol definition.
+    fn extend(&mut self, definition: Definition, source: &SourceText) {
+        self.end_byte = definition.span.end_byte;
+        self.end_line = source.line_number_at(definition.span.end_byte.saturating_sub(1));
+        self.count += 1;
+    }
+
+    /// Materialize the final placeholder item for the accumulated run.
+    fn finish(self) -> SkippedRange {
+        SkippedRange {
+            span: explicit_span(self.start_byte, self.end_byte),
+            line_range: LineRange {
+                start: self.start_line,
+                end: self.end_line,
+            },
+            count: self.count,
+        }
+    }
 }
 
 /// Find the first concrete syntax issue inside a recovered tree.

@@ -292,6 +292,49 @@ fn show_returns_restores_actual_returns_only() {
     assert!(!rust_output.contains("Ok(self.name.clone())"));
 }
 
+/// Verify that adjacent top-level symbols collapse into deterministic skipped-range placeholders.
+#[test]
+fn default_output_collapses_top_level_symbol_runs() {
+    // Pin the consolidation logic so large constant blocks stay readable without losing source order.
+    let temp = tempdir().expect("failed to create temporary directory");
+    let file = temp.path().join("top_level_symbols.py");
+    std::fs::write(
+        &file,
+        "A = 1\nB = 2\nC = 3\n\ndef visible() -> int:\n    \"\"\"Visible docs.\"\"\"\n    return 1\n\nD = 4\n",
+    )
+    .expect("failed to write python fixture");
+
+    let default_output = successful_stdout(run_treebrief(&file));
+    let explicit_output = successful_stdout(run_treebrief_with_args(
+        &file,
+        &["--show-top-level-symbols"],
+    ));
+
+    assert!(default_output.contains("[1-3] Skipped top-level assignments/constants (3 items)"));
+    assert!(default_output.contains("[9] Skipped top-level assignments/constants (1 item)"));
+    assert!(!default_output.contains("Assignment: A"));
+    assert!(explicit_output.contains("[1] Assignment: A"));
+    assert!(explicit_output.contains("[2] Assignment: B"));
+    assert!(explicit_output.contains("[3] Assignment: C"));
+    assert!(explicit_output.contains("[9] Assignment: D"));
+    assert!(!explicit_output.contains("Skipped top-level assignments/constants"));
+}
+
+/// Verify that plain top-level comments survive even when the following symbol run is collapsed.
+#[test]
+fn plain_top_level_comments_are_not_swallowed_by_symbol_placeholders() {
+    // Keep generic module-context comments visible while still collapsing the adjacent symbol run.
+    let temp = tempdir().expect("failed to create temporary directory");
+    let file = temp.path().join("comment_then_symbols.py");
+    std::fs::write(&file, "# module context\nA = 1\nB = 2\n")
+        .expect("failed to write python fixture");
+
+    let output = successful_stdout(run_treebrief(&file));
+
+    assert!(output.contains("# module context"));
+    assert!(output.contains("[2-3] Skipped top-level assignments/constants (2 items)"));
+}
+
 /// Verify that decorated methods still read as methods instead of plain functions.
 #[test]
 fn decorated_python_method_keeps_method_label() {

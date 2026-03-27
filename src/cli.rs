@@ -15,6 +15,9 @@ pub struct Cli {
     /// Surface actual `return` statements in retained definition bodies.
     #[arg(long)]
     pub show_returns: bool,
+    /// Restore explicit top-level assignment and constant-style symbol definitions.
+    #[arg(long)]
+    pub show_top_level_symbols: bool,
     /// The file or directory to analyze.
     pub path: PathBuf,
 }
