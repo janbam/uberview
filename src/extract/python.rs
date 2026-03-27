@@ -1,14 +1,14 @@
 use tree_sitter::Node;
 
-use crate::model::TextSpan;
+use crate::model::{DefinitionKind, TextSpan};
 use crate::source::SourceText;
 
-use super::{DefinitionCapture, explicit_span, node_span};
+use super::{DefinitionCapture, child_field_text, explicit_span, node_span, trimmed_node_text};
 
 /// Capture one Python definition if the node contributes structural surface area.
 pub fn capture_definition<'tree>(
     node: Node<'tree>,
-    _source: &SourceText,
+    source: &SourceText,
 ) -> Option<DefinitionCapture<'tree>> {
     match node.kind() {
         "function_definition" | "class_definition" => {
@@ -16,6 +16,8 @@ pub fn capture_definition<'tree>(
             let header_end = body.map_or(node.end_byte(), |body| body.start_byte());
 
             Some(DefinitionCapture {
+                kind: definition_kind(node),
+                name: definition_name(node, source)?,
                 span: node_span(node),
                 header_span: explicit_span(node.start_byte(), header_end),
                 body,
@@ -27,6 +29,8 @@ pub fn capture_definition<'tree>(
             let header_end = body.map_or(node.end_byte(), |body| body.start_byte());
 
             Some(DefinitionCapture {
+                kind: definition_kind(definition),
+                name: definition_name(definition, source)?,
                 span: explicit_span(node.start_byte(), definition.end_byte()),
                 header_span: explicit_span(node.start_byte(), header_end),
                 body,
@@ -35,6 +39,8 @@ pub fn capture_definition<'tree>(
         "assignment" | "augmented_assignment" | "type_alias_statement" => {
             if is_module_level_assignment(node) {
                 Some(DefinitionCapture {
+                    kind: assignment_kind(node),
+                    name: assignment_name(node, source)?,
                     span: node_span(node),
                     header_span: node_span(node),
                     body: None,
@@ -108,6 +114,41 @@ fn is_docstring_statement(node: Node<'_>) -> bool {
     false
 }
 
+/// Decide which structural label to attach to a retained Python definition.
+fn definition_kind(node: Node<'_>) -> DefinitionKind {
+    match node.kind() {
+        "class_definition" => DefinitionKind::Class,
+        "function_definition" if is_method_definition(node) => DefinitionKind::Method,
+        "function_definition" => DefinitionKind::Function,
+        _ => DefinitionKind::Function,
+    }
+}
+
+/// Extract the source-derived display name for a retained Python definition.
+fn definition_name(node: Node<'_>, source: &SourceText) -> Option<String> {
+    child_field_text(node, "name", source)
+}
+
+/// Decide which structural label to attach to a retained Python assignment-like symbol.
+fn assignment_kind(node: Node<'_>) -> DefinitionKind {
+    match node.kind() {
+        "type_alias_statement" => DefinitionKind::TypeAlias,
+        _ => DefinitionKind::Assignment,
+    }
+}
+
+/// Extract the source-derived display name for a retained Python assignment-like symbol.
+fn assignment_name(node: Node<'_>, source: &SourceText) -> Option<String> {
+    for field_name in ["left", "name", "target"] {
+        if let Some(name) = child_field_text(node, field_name, source) {
+            return Some(name);
+        }
+    }
+
+    node.named_child(0)
+        .map(|child| trimmed_node_text(source, child))
+}
+
 /// Decide whether a statement contains a `yield` or `yield from` exit surface.
 fn statement_contains_yield(node: Node<'_>) -> bool {
     let mut cursor = node.walk();
@@ -137,5 +178,24 @@ fn is_module_level_assignment(node: Node<'_>) -> bool {
 
     parent.parent().is_some_and(|grandparent| {
         parent.kind() == "expression_statement" && grandparent.kind() == "module"
+    })
+}
+
+/// Decide whether a Python function lives directly inside a class body and should read as a method.
+fn is_method_definition(node: Node<'_>) -> bool {
+    let Some(parent) = node.parent() else {
+        return false;
+    };
+
+    if parent.kind() != "block" {
+        return false;
+    }
+
+    parent.parent().is_some_and(|grandparent| {
+        grandparent.kind() == "class_definition"
+            || (grandparent.kind() == "decorated_definition"
+                && grandparent
+                    .child_by_field_name("definition")
+                    .is_some_and(|definition| definition.kind() == "class_definition"))
     })
 }

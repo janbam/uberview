@@ -2,24 +2,34 @@
 
 """Python module docs."""
 # Module context that should stay.
-5-5	DEFAULT_NAME = "treebrief"
-8-21	@cache
+[5] Assignment: DEFAULT_NAME
+DEFAULT_NAME = "treebrief"
+
+[8-21] Function: top_level
+@cache
 def top_level(
     value: int,
 ) -> int:
     """Handle the top-level case."""
     # Normalize before branching.
-14-16	    def nested(value: int) -> int:
+    [14-16] Function: nested
+    def nested(value: int) -> int:
         # Leave the nested exit visible.
         return value + 1
+
         raise ValueError("negative")
     return nested(value)
-24-27	def stream_names(names: list[str]):
+
+[24-27] Function: stream_names
+def stream_names(names: list[str]):
     # Yield the normalized values.
         yield name.upper()
-30-39	class Greeter:
+
+[30-39] Class: Greeter
+class Greeter:
     """Greeter docs."""
-33-39	    async def load_many(
+    [33-39] Method: load_many
+    async def load_many(
         self,
         names: list[str],
     ) -> list[str]:

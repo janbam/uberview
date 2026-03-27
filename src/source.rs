@@ -82,6 +82,11 @@ impl SourceText {
         line_index.max(1)
     }
 
+    /// Return the whitespace indentation that precedes the provided byte offset.
+    pub fn leading_indentation_at(&self, byte_offset: usize) -> &str {
+        self.leading_indentation(byte_offset)
+    }
+
     /// Return the whitespace indentation that precedes the span on its original line.
     fn leading_indentation(&self, byte_offset: usize) -> &str {
         let line_start = self.line_start(byte_offset);
