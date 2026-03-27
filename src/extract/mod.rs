@@ -237,7 +237,7 @@ fn belongs_to_skipped_symbol_run(
     match item {
         Item::Definition(definition) => should_skip_top_level_symbol(definition),
         Item::Snippet(snippet) => {
-            is_comment_like_snippet(source, *snippet)
+            is_symbol_attached_comment_snippet(source, *snippet)
                 && (comment_adjoins_skipped_symbol(items, index, source, -1)
                     || comment_adjoins_skipped_symbol(items, index, source, 1))
         }
@@ -318,14 +318,14 @@ fn trimmed_node_text(source: &SourceText, node: Node<'_>) -> String {
     source.span_text(node_span(node)).trim().to_owned()
 }
 
-/// Decide whether a top-level snippet line reads like a comment that can be dropped with a symbol run.
-fn is_comment_like_snippet(source: &SourceText, snippet: Snippet) -> bool {
+/// Decide whether a top-level snippet reads like a symbol-attached doc comment.
+fn is_symbol_attached_comment_snippet(source: &SourceText, snippet: Snippet) -> bool {
     let text = source.span_text(source.trim_trailing_line_breaks(snippet.span));
     let trimmed = text.trim_start();
 
-    trimmed.starts_with('#')
-        || trimmed.starts_with("//")
-        || trimmed.starts_with("/*")
+    trimmed.starts_with("#:")
+        || trimmed.starts_with("///")
+        || trimmed.starts_with("//!")
         || trimmed.starts_with("/**")
 }
 

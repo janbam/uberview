@@ -320,6 +320,21 @@ fn default_output_collapses_top_level_symbol_runs() {
     assert!(!explicit_output.contains("Skipped top-level assignments/constants"));
 }
 
+/// Verify that plain top-level comments survive even when the following symbol run is collapsed.
+#[test]
+fn plain_top_level_comments_are_not_swallowed_by_symbol_placeholders() {
+    // Keep generic module-context comments visible while still collapsing the adjacent symbol run.
+    let temp = tempdir().expect("failed to create temporary directory");
+    let file = temp.path().join("comment_then_symbols.py");
+    std::fs::write(&file, "# module context\nA = 1\nB = 2\n")
+        .expect("failed to write python fixture");
+
+    let output = successful_stdout(run_treebrief(&file));
+
+    assert!(output.contains("# module context"));
+    assert!(output.contains("[2-3] Skipped top-level assignments/constants (2 items)"));
+}
+
 /// Verify that decorated methods still read as methods instead of plain functions.
 #[test]
 fn decorated_python_method_keeps_method_label() {
