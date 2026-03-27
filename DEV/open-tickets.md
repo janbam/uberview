@@ -4,32 +4,6 @@ Tickets captured on 2026-03-27 after reviewing TreeBrief output for `/home/jan/w
 
 ## Active
 
-### TB-001 Rework definition headers, line ranges, and spacing
-
-Goal:
-- Make retained definitions easier to scan in large files by replacing the current `start-end<TAB>source` prefix with a clearer header contract.
-
-Requirements:
-- Render retained definition headers as `[start-end] Kind: name`.
-- Collapse single-line ranges from `[5-5]` to `[5]`.
-- Keep labels simple, for example `Function`, `Class`, and similar language-appropriate kinds.
-- Remove the current line-number-plus-tab presentation.
-- Keep the retained signature, docstrings, and comments in source-like form below the header.
-- Insert one blank line after each retained definition block.
-- Show line numbers by default only for retained definitions.
-- Add `--show-line-numbers-for-all-items` to extend line numbers to all retained items.
-
-Implementation Notes:
-- The internal model will likely need to store a simple definition kind so the renderer can emit `Function`, `Class`, and similar labels directly.
-- This ticket changes the text output contract and will require snapshot updates.
-
-Done When:
-- A file such as `proposals.py` renders headers like `[184-242] Function: create_task_reschedule_due_proposal`.
-- Single-line retained definitions render as `[n]`, not `[n-n]`.
-- Retained definition blocks are separated by a blank line.
-- `--show-line-numbers-for-all-items` is covered by CLI tests.
-- `README.md` and `DEV/SPEC.md` describe the new header and line-number behavior.
-
 ### TB-002 Make return rendering opt-in and limit it to true returns
 
 Goal:
@@ -94,6 +68,10 @@ Done When:
 - Output order follows input-root order, then deterministic in-root ordering.
 - Overlapping roots or repeated file arguments do not produce duplicate sections.
 - CLI tests cover mixed file and directory input, stable ordering, and deduplication.
+
+## Completed
+
+- TB-001 Rework definition headers, line ranges, and spacing. Closed on 2026-03-27 after validating the new header contract, line-number flag, docs, and `proposals.py` output.
 
 ## Deferred
 

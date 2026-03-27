@@ -109,7 +109,16 @@ fn render_definition(
         definition.kind.label(),
         definition.name
     ));
-    lines.extend(header_lines);
+    let signature_end = header_signature_end(&header_lines);
+    let (signature_lines, trailing_header_lines) = header_lines.split_at(signature_end + 1);
+    lines.extend(signature_lines.iter().cloned());
+    render_trailing_header_lines(
+        definition,
+        signature_end,
+        trailing_header_lines,
+        options,
+        lines,
+    );
 
     // Keep nested retained items immediately after the header so source order stays intact.
     for item in &definition.items {
@@ -118,6 +127,54 @@ fn render_definition(
 
     // Separate whole definition blocks so adjacent structure does not visually collapse together.
     lines.push(String::new());
+}
+
+/// Render any retained lines that were captured between the signature and the first named child.
+fn render_trailing_header_lines(
+    definition: &Definition,
+    signature_end: usize,
+    trailing_header_lines: &[String],
+    options: RenderOptions,
+    lines: &mut Vec<String>,
+) {
+    // Keep the default output source-like, but number these retained lines when the user opts in.
+    if !options.show_line_numbers_for_all_items {
+        lines.extend(trailing_header_lines.iter().cloned());
+        return;
+    }
+
+    let line_offset = definition.line_range.start + signature_end;
+
+    for (index, line) in trailing_header_lines.iter().enumerate() {
+        if line.is_empty() {
+            lines.push(String::new());
+            continue;
+        }
+
+        let line_number = line_offset + index + 1;
+        let indentation = line
+            .chars()
+            .take_while(|character| matches!(character, ' ' | '\t'))
+            .collect::<String>();
+        let content = line.strip_prefix(&indentation).unwrap_or(line);
+
+        lines.push(format!(
+            "{indentation}[{}] {}",
+            format_line_range(LineRange {
+                start: line_number,
+                end: line_number,
+            }),
+            content
+        ));
+    }
+}
+
+/// Find the last signature line inside one retained definition header.
+fn header_signature_end(header_lines: &[String]) -> usize {
+    header_lines
+        .iter()
+        .rposition(|line| line.trim_end().ends_with(':'))
+        .unwrap_or_else(|| header_lines.len().saturating_sub(1))
 }
 
 /// Render a retained line range in the compact bracketed form.

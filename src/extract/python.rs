@@ -187,11 +187,21 @@ fn is_method_definition(node: Node<'_>) -> bool {
         return false;
     };
 
-    if parent.kind() != "block" {
+    let body = if parent.kind() == "decorated_definition" {
+        let Some(block) = parent.parent() else {
+            return false;
+        };
+
+        block
+    } else {
+        parent
+    };
+
+    if body.kind() != "block" {
         return false;
     }
 
-    parent.parent().is_some_and(|grandparent| {
+    body.parent().is_some_and(|grandparent| {
         grandparent.kind() == "class_definition"
             || (grandparent.kind() == "decorated_definition"
                 && grandparent

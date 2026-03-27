@@ -228,8 +228,28 @@ fn show_line_numbers_for_all_items_numbers_snippets_too() {
     assert!(output.contains("[1] \"\"\"Python module docs.\"\"\""));
     assert!(output.contains("[3] # Module context that should stay."));
     assert!(output.contains("    [12] \"\"\"Handle the top-level case.\"\"\""));
+    assert!(output.contains("    [15] # Leave the nested exit visible."));
+    assert!(output.contains("    [25] # Yield the normalized values."));
     assert!(output.contains("        [16] return value + 1"));
     assert!(output.contains("        [39] return [name.upper() for name in names]"));
+}
+
+/// Verify that decorated methods still read as methods instead of plain functions.
+#[test]
+fn decorated_python_method_keeps_method_label() {
+    // Pin the common `@classmethod` shape so method classification does not regress on wrapped defs.
+    let temp = tempdir().expect("failed to create temporary directory");
+    let file = temp.path().join("decorated_method.py");
+    std::fs::write(
+        &file,
+        "class Example:\n    @classmethod\n    def build(cls):\n        return cls()\n",
+    )
+    .expect("failed to write python fixture");
+
+    let output = successful_stdout(run_treebrief(&file));
+
+    assert!(output.contains("[1-4] Class: Example"));
+    assert!(output.contains("    [2-4] Method: build"));
 }
 
 /// Verify that concurrent invocations produce byte-identical results.
