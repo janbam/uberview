@@ -1,0 +1,32 @@
+=== tests/fixtures/sample_project/src/rust_sample.rs ===
+
+//! Crate docs.
+3-7	#[derive(Debug)]
+pub struct Config {
+    /// Public name surface.
+6-6	    pub name: String
+9-12	pub enum Mode {
+10-10	    Fast
+11-11	    Slow
+/// Service behavior.
+15-18	pub trait Service {
+    /// Run once.
+17-17	    fn run(&self) -> String;
+20-20	pub type ResultAlias<T> = Result<T, String>;
+22-26	macro_rules! make_value {
+    () => {
+        1
+    };
+}
+28-42	impl Config {
+29-29	    pub const DEFAULT_NAME: &'static str = "treebrief";
+31-41	    pub fn render(
+        &self,
+    ) -> Result<String, String> {
+        // Keep the early-exit line.
+        let value = self.name.parse::<usize>()?;
+            return Err("zero".to_owned())
+        Ok(self.name.clone())
+44-47	pub fn build_message(name: &str) -> String {
+    // Preserve the tail expression.
+    format!("hello {name}")
