@@ -114,7 +114,7 @@ pub struct FileSection {
 /// A source-ordered retained item inside a file or definition scope.
 #[derive(Debug)]
 pub enum Item {
-    /// A verbatim snippet such as a comment, docstring, or exit statement.
+    /// A verbatim snippet such as a comment, docstring, or opt-in return statement.
     Snippet(Snippet),
     /// A retained definition with its nested reduced-source body.
     Definition(Definition),

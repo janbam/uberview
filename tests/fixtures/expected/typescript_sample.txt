@@ -22,7 +22,6 @@ export namespace helpers {
     prefix: string,
   ) => {
     // Return the formatted label.
-    return (value: string): string => `${prefix}:${value}`;
 
 
 [20-33] Class: Worker
@@ -37,6 +36,3 @@ export class Worker {
     // Keep the nested helper.
     [27-29] Function: normalize
     function normalize(value: string): string {
-      return value.trim();
-
-    return normalize(input);

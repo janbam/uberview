@@ -4,8 +4,8 @@ use crate::model::{DefinitionKind, TextSpan};
 use crate::source::SourceText;
 
 use super::{
-    DefinitionCapture, body_header_end, child_field_text, expand_start_with_prefix_siblings,
-    explicit_span, node_span, trimmed_node_text,
+    DefinitionCapture, ExtractOptions, body_header_end, child_field_text,
+    expand_start_with_prefix_siblings, explicit_span, node_span, trimmed_node_text,
 };
 
 /// Capture one Rust definition if the node contributes structural surface area.
@@ -33,14 +33,11 @@ pub fn capture_definition<'tree>(
     }
 }
 
-/// Capture one retained Rust snippet such as comments, returns, `?`, or tail expressions.
-pub fn capture_snippet(node: Node<'_>) -> Option<TextSpan> {
+/// Capture one retained Rust snippet such as comments or an opt-in `return`.
+pub fn capture_snippet(node: Node<'_>, options: ExtractOptions) -> Option<TextSpan> {
     match node.kind() {
-        "line_comment" | "block_comment" | "comment" | "return_expression" => Some(node_span(node)),
-        "expression_statement" | "let_declaration" if contains_try_expression(node) => {
-            Some(node_span(node))
-        }
-        kind if is_tail_expression(kind, node) => Some(node_span(node)),
+        "line_comment" | "block_comment" | "comment" => Some(node_span(node)),
+        "return_expression" if options.show_returns => Some(node_span(node)),
         _ => None,
     }
 }
@@ -93,63 +90,6 @@ fn prefixed_span(node: Node<'_>) -> TextSpan {
     });
 
     explicit_span(start, node.end_byte())
-}
-
-/// Decide whether a retained statement contains a `?` early-exit surface.
-fn contains_try_expression(node: Node<'_>) -> bool {
-    let mut cursor = node.walk();
-
-    for child in node.children(&mut cursor) {
-        if child.kind() == "try_expression" {
-            return true;
-        }
-
-        if child.is_named() && contains_try_expression(child) {
-            return true;
-        }
-    }
-
-    false
-}
-
-/// Decide whether a node is the final tail expression of its containing block.
-fn is_tail_expression(kind: &str, node: Node<'_>) -> bool {
-    if !matches!(
-        kind,
-        "identifier"
-            | "call_expression"
-            | "field_expression"
-            | "binary_expression"
-            | "if_expression"
-            | "match_expression"
-            | "macro_invocation"
-            | "tuple_expression"
-            | "array_expression"
-            | "scoped_identifier"
-            | "reference_expression"
-            | "await_expression"
-            | "try_expression"
-            | "closure_expression"
-            | "block"
-    ) {
-        return false;
-    }
-
-    let Some(parent) = node.parent() else {
-        return false;
-    };
-
-    if parent.kind() != "block" {
-        return false;
-    }
-
-    let mut cursor = parent.walk();
-    let last_named = parent
-        .children(&mut cursor)
-        .filter(|child| child.is_named())
-        .last();
-
-    last_named.is_some_and(|last| last.id() == node.id())
 }
 
 /// Decide which synthetic label should describe a retained Rust definition.

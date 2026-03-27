@@ -83,7 +83,7 @@ fn assert_in_order(haystack: &str, needles: &[&str]) {
 /// Verify the Python reduced-source contract on a representative single file.
 #[test]
 fn python_single_file_matches_expected_output() {
-    // Lock the CLI contract for comments, nested defs, docstrings, exits, and async members.
+    // Lock the CLI contract for comments, nested defs, docstrings, and async members.
     let output = successful_stdout(run_treebrief(&fixture_path(
         "sample_project/src/python_sample.py",
     )));
@@ -122,7 +122,7 @@ fn typescript_single_file_matches_expected_output() {
 /// Verify the Rust reduced-source contract on a representative single file.
 #[test]
 fn rust_single_file_matches_expected_output() {
-    // Lock the CLI contract for attributes, fields, traits, impls, macros, `?`, and tail expressions.
+    // Lock the CLI contract for attributes, fields, traits, impls, macros, and opt-in returns.
     let output = successful_stdout(run_treebrief(&fixture_path(
         "sample_project/src/rust_sample.rs",
     )));
@@ -230,8 +230,66 @@ fn show_line_numbers_for_all_items_numbers_snippets_too() {
     assert!(output.contains("    [12] \"\"\"Handle the top-level case.\"\"\""));
     assert!(output.contains("    [15] # Leave the nested exit visible."));
     assert!(output.contains("    [25] # Yield the normalized values."));
-    assert!(output.contains("        [16] return value + 1"));
-    assert!(output.contains("        [39] return [name.upper() for name in names]"));
+    assert!(!output.contains("return value + 1"));
+    assert!(!output.contains("return [name.upper() for name in names]"));
+}
+
+/// Verify that return-like lines disappear from the default reduced output.
+#[test]
+fn default_output_omits_exit_like_lines() {
+    // Keep the default view focused on structure instead of control-flow exits.
+    let python_output = successful_stdout(run_treebrief(&fixture_path(
+        "sample_project/src/python_sample.py",
+    )));
+    let javascript_output = successful_stdout(run_treebrief(&fixture_path(
+        "sample_project/src/javascript_sample.js",
+    )));
+    let rust_output = successful_stdout(run_treebrief(&fixture_path(
+        "sample_project/src/rust_sample.rs",
+    )));
+
+    assert!(!python_output.contains("return value + 1"));
+    assert!(!python_output.contains("raise ValueError"));
+    assert!(!python_output.contains("yield name.upper()"));
+    assert!(!javascript_output.contains("return normalize(name);"));
+    assert!(!javascript_output.contains("throw new Error(\"missing prefix\")"));
+    assert!(!rust_output.contains("parse::<usize>()?"));
+    assert!(!rust_output.contains("return Err(\"zero\".to_owned())"));
+    assert!(!rust_output.contains("Ok(self.name.clone())"));
+}
+
+/// Verify that `--show-returns` restores only actual return statements.
+#[test]
+fn show_returns_restores_actual_returns_only() {
+    // Exercise multiple language families so keyword returns come back without reintroducing other exits.
+    let python_output = successful_stdout(run_treebrief_with_args(
+        &fixture_path("sample_project/src/python_sample.py"),
+        &["--show-returns"],
+    ));
+    let javascript_output = successful_stdout(run_treebrief_with_args(
+        &fixture_path("sample_project/src/javascript_sample.js"),
+        &["--show-returns"],
+    ));
+    let rust_output = successful_stdout(run_treebrief_with_args(
+        &fixture_path("sample_project/src/rust_sample.rs"),
+        &["--show-returns"],
+    ));
+
+    assert!(python_output.contains("return value + 1"));
+    assert!(python_output.contains("return nested(value)"));
+    assert!(python_output.contains("return [name.upper() for name in names]"));
+    assert!(!python_output.contains("raise ValueError"));
+    assert!(!python_output.contains("yield name.upper()"));
+
+    assert!(javascript_output.contains("return value.trim();"));
+    assert!(javascript_output.contains("return normalize(name);"));
+    assert!(javascript_output.contains("return (name) => `${prefix}: ${name}`;"));
+    assert!(javascript_output.contains("return `${name}!`;"));
+    assert!(!javascript_output.contains("throw new Error(\"missing prefix\")"));
+
+    assert!(rust_output.contains("return Err(\"zero\".to_owned())"));
+    assert!(!rust_output.contains("parse::<usize>()?"));
+    assert!(!rust_output.contains("Ok(self.name.clone())"));
 }
 
 /// Verify that decorated methods still read as methods instead of plain functions.
