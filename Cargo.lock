@@ -602,7 +602,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "treebrief"
+name = "uberview"
 version = "0.1.0"
 dependencies = [
  "anyhow",

@@ -1,6 +1,6 @@
-# TreeBrief
+# Uberview
 
-TreeBrief is a CLI that prints a compact, source-ordered structural overview of source files and codebases.
+Uberview is a CLI that prints a compact, source-ordered structural overview of source files and codebases.
 
 It is designed for fast codebase orientation:
 
@@ -20,7 +20,7 @@ The output reads like reduced source, not metadata.
 - TypeScript and TSX
 - Rust
 
-TreeBrief auto-detects languages by extension first, then filename patterns, then lightweight shebang sniffing when needed.
+Uberview auto-detects languages by extension first, then filename patterns, then lightweight shebang sniffing when needed.
 
 ## Install And Run
 
@@ -30,7 +30,7 @@ For a quick scan from the repository root:
 cargo run src
 ```
 
-For explicit argument passthrough, especially when using TreeBrief flags:
+For explicit argument passthrough, especially when using Uberview flags:
 
 ```bash
 cargo run -- <path> [path...]
@@ -52,7 +52,7 @@ For a release-style local build:
 
 ```bash
 cargo build --release
-./target/release/treebrief <path>
+./target/release/uberview <path>
 ```
 
 ## Output Shape
@@ -97,7 +97,7 @@ Rules:
 
 ## Default Directory Ignore Rules
 
-TreeBrief skips these directories during recursive scans:
+Uberview skips these directories during recursive scans:
 
 - `.git`
 - `node_modules`
@@ -118,7 +118,7 @@ cargo clippy --all-targets -- -D warnings
 cargo test
 ```
 
-The repository pins Rust `1.88.0` via [`rust-toolchain.toml`](/home/jan/work/treebrief/rust-toolchain.toml) so local runs and CI use the same lint and formatting surface.
+The repository pins Rust `1.88.0` via [`rust-toolchain.toml`](rust-toolchain.toml) so local runs and CI use the same lint and formatting surface.
 
 The test suite includes:
 
@@ -137,7 +137,7 @@ The test suite includes:
 
 ## Current Scope
 
-TreeBrief is intentionally a reduced-source mapper, not a semantic analyzer.
+Uberview is intentionally a reduced-source mapper, not a semantic analyzer.
 
 Notable v1 constraints:
 

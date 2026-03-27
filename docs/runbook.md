@@ -1,8 +1,8 @@
-# TreeBrief Runbook
+# Uberview Runbook
 
 ## Purpose
 
-This runbook covers the routine operational loop for TreeBrief: validate changes, inspect regressions, and prepare a release-quality binary.
+This runbook covers the routine operational loop for Uberview: validate changes, inspect regressions, and prepare a release-quality binary.
 
 ## Local Validation
 
@@ -31,7 +31,7 @@ cargo build --release
 The resulting binary is:
 
 ```text
-target/release/treebrief
+target/release/uberview
 ```
 
 ## Troubleshooting
@@ -50,7 +50,7 @@ target/release/treebrief
 
 ### Syntax errors produce little output
 
-- TreeBrief uses concrete syntax trees and will attempt recovery.
+- Uberview uses concrete syntax trees and will attempt recovery.
 - Heavily malformed files may still reduce to `(no retained structure)` if no safe retained items remain.
 
 ### CI fails on formatting or linting

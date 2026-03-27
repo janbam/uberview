@@ -23,29 +23,29 @@ fn fixture_display_path(relative: &str) -> String {
 
 /// Return the compiled binary path exposed by Cargo integration tests.
 fn binary_path() -> &'static str {
-    env!("CARGO_BIN_EXE_treebrief")
+    env!("CARGO_BIN_EXE_uberview")
 }
 
-/// Run TreeBrief for one input path and capture the full process output.
-fn run_treebrief(path: &Path) -> Output {
-    run_treebrief_with_args(path, &[])
+/// Run Uberview for one input path and capture the full process output.
+fn run_uberview(path: &Path) -> Output {
+    run_uberview_with_args(path, &[])
 }
 
-/// Run TreeBrief for one input path plus extra CLI flags.
-fn run_treebrief_with_args(path: &Path, args: &[&str]) -> Output {
+/// Run Uberview for one input path plus extra CLI flags.
+fn run_uberview_with_args(path: &Path, args: &[&str]) -> Output {
     // Build the command explicitly so flag-based contract tests hit the real binary surface.
     let mut command = Command::new(binary_path());
     command.args(args).arg(path);
-    command.output().expect("failed to run treebrief")
+    command.output().expect("failed to run uberview")
 }
 
-/// Run TreeBrief from a different working directory to verify cwd independence.
-fn run_treebrief_from_cwd(path: &Path, cwd: &Path) -> Output {
+/// Run Uberview from a different working directory to verify cwd independence.
+fn run_uberview_from_cwd(path: &Path, cwd: &Path) -> Output {
     Command::new(binary_path())
         .current_dir(cwd)
         .arg(path)
         .output()
-        .expect("failed to run treebrief from alternate cwd")
+        .expect("failed to run uberview from alternate cwd")
 }
 
 /// Decode stdout and stderr into UTF-8 strings for assertions.
@@ -84,7 +84,7 @@ fn assert_in_order(haystack: &str, needles: &[&str]) {
 #[test]
 fn python_single_file_matches_expected_output() {
     // Lock the CLI contract for comments, nested defs, docstrings, and async members.
-    let output = successful_stdout(run_treebrief(&fixture_path(
+    let output = successful_stdout(run_uberview(&fixture_path(
         "sample_project/src/python_sample.py",
     )));
     let expected = std::fs::read_to_string(fixture_path("expected/python_sample.txt"))
@@ -97,7 +97,7 @@ fn python_single_file_matches_expected_output() {
 #[test]
 fn javascript_single_file_matches_expected_output() {
     // Lock the CLI contract for exported functions, arrow constants, JSDoc, and nested closures.
-    let output = successful_stdout(run_treebrief(&fixture_path(
+    let output = successful_stdout(run_uberview(&fixture_path(
         "sample_project/src/javascript_sample.js",
     )));
     let expected = std::fs::read_to_string(fixture_path("expected/javascript_sample.txt"))
@@ -110,7 +110,7 @@ fn javascript_single_file_matches_expected_output() {
 #[test]
 fn typescript_single_file_matches_expected_output() {
     // Lock the CLI contract for retained grouping headers, callables, and nested helpers.
-    let output = successful_stdout(run_treebrief(&fixture_path(
+    let output = successful_stdout(run_uberview(&fixture_path(
         "sample_project/src/typescript_sample.ts",
     )));
     let expected = std::fs::read_to_string(fixture_path("expected/typescript_sample.txt"))
@@ -123,7 +123,7 @@ fn typescript_single_file_matches_expected_output() {
 #[test]
 fn rust_single_file_matches_expected_output() {
     // Lock the CLI contract for retained grouping headers, methods, and opt-in returns.
-    let output = successful_stdout(run_treebrief(&fixture_path(
+    let output = successful_stdout(run_uberview(&fixture_path(
         "sample_project/src/rust_sample.rs",
     )));
     let expected = std::fs::read_to_string(fixture_path("expected/rust_sample.txt"))
@@ -136,7 +136,7 @@ fn rust_single_file_matches_expected_output() {
 #[test]
 fn directory_scan_is_deterministic_and_skips_default_ignored_dirs() {
     // Exercise the whole directory contract instead of only isolated file parsing.
-    let output = successful_stdout(run_treebrief(&fixture_path("sample_project")));
+    let output = successful_stdout(run_uberview(&fixture_path("sample_project")));
 
     assert_in_order(
         &output,
@@ -158,7 +158,7 @@ fn directory_scan_is_deterministic_and_skips_default_ignored_dirs() {
 #[test]
 fn broken_single_file_exits_non_zero_with_parse_error() {
     // Ensure single-file syntax errors are visible and actionable to the caller.
-    let output = run_treebrief(&fixture_path("sample_project/src/python_broken.py"));
+    let output = run_uberview(&fixture_path("sample_project/src/python_broken.py"));
     let (stdout, stderr) = decode_output(&output);
 
     assert!(
@@ -182,7 +182,7 @@ fn broken_single_file_exits_non_zero_with_parse_error() {
 #[test]
 fn later_broken_single_file_reports_precise_location() {
     // Pin a non-trivial recovery shape so parse-location reporting cannot drift silently.
-    let output = run_treebrief(&fixture_path("broken/python_unexpected_token.py"));
+    let output = run_uberview(&fixture_path("broken/python_unexpected_token.py"));
     let (stdout, stderr) = decode_output(&output);
 
     assert!(
@@ -207,7 +207,7 @@ fn later_broken_single_file_reports_precise_location() {
 fn extensionless_python_file_works_from_other_cwd() {
     // Run from a throwaway cwd so the implementation cannot accidentally rely on the caller's location.
     let temp = tempdir().expect("failed to create temporary directory");
-    let output = successful_stdout(run_treebrief_from_cwd(
+    let output = successful_stdout(run_uberview_from_cwd(
         &fixture_path("sample_project/scripts/python_tool"),
         temp.path(),
     ));
@@ -220,7 +220,7 @@ fn extensionless_python_file_works_from_other_cwd() {
 #[test]
 fn show_line_numbers_for_all_items_numbers_snippets_too() {
     // Exercise the CLI flag directly so non-definition numbering stays part of the public contract.
-    let output = successful_stdout(run_treebrief_with_args(
+    let output = successful_stdout(run_uberview_with_args(
         &fixture_path("sample_project/src/python_sample.py"),
         &["--show-line-numbers-for-all-items"],
     ));
@@ -238,13 +238,13 @@ fn show_line_numbers_for_all_items_numbers_snippets_too() {
 #[test]
 fn default_output_omits_exit_like_lines() {
     // Keep the default view focused on structure instead of control-flow exits.
-    let python_output = successful_stdout(run_treebrief(&fixture_path(
+    let python_output = successful_stdout(run_uberview(&fixture_path(
         "sample_project/src/python_sample.py",
     )));
-    let javascript_output = successful_stdout(run_treebrief(&fixture_path(
+    let javascript_output = successful_stdout(run_uberview(&fixture_path(
         "sample_project/src/javascript_sample.js",
     )));
-    let rust_output = successful_stdout(run_treebrief(&fixture_path(
+    let rust_output = successful_stdout(run_uberview(&fixture_path(
         "sample_project/src/rust_sample.rs",
     )));
 
@@ -262,15 +262,15 @@ fn default_output_omits_exit_like_lines() {
 #[test]
 fn show_returns_restores_actual_returns_only() {
     // Exercise multiple language families so keyword returns come back without reintroducing other exits.
-    let python_output = successful_stdout(run_treebrief_with_args(
+    let python_output = successful_stdout(run_uberview_with_args(
         &fixture_path("sample_project/src/python_sample.py"),
         &["--show-returns"],
     ));
-    let javascript_output = successful_stdout(run_treebrief_with_args(
+    let javascript_output = successful_stdout(run_uberview_with_args(
         &fixture_path("sample_project/src/javascript_sample.js"),
         &["--show-returns"],
     ));
-    let rust_output = successful_stdout(run_treebrief_with_args(
+    let rust_output = successful_stdout(run_uberview_with_args(
         &fixture_path("sample_project/src/rust_sample.rs"),
         &["--show-returns"],
     ));
@@ -304,7 +304,7 @@ fn mixed_file_and_directory_inputs_keep_order_without_duplicates() {
             .arg(&file)
             .arg(&directory)
             .output()
-            .expect("failed to run treebrief with mixed inputs"),
+            .expect("failed to run uberview with mixed inputs"),
     );
 
     assert_in_order(
@@ -338,7 +338,7 @@ fn normalized_file_input_deduplicates_against_later_directory_root() {
             .arg(&odd_spelling)
             .arg(&directory)
             .output()
-            .expect("failed to run treebrief with normalized-equivalent inputs"),
+            .expect("failed to run uberview with normalized-equivalent inputs"),
     );
 
     assert_in_order(
@@ -372,7 +372,7 @@ fn overlapping_directory_roots_keep_stable_unique_order() {
             .arg(&narrow_root)
             .arg(&broad_root)
             .output()
-            .expect("failed to run treebrief with overlapping directories"),
+            .expect("failed to run uberview with overlapping directories"),
     );
 
     assert_in_order(
@@ -402,11 +402,9 @@ fn default_output_omits_top_level_symbol_runs() {
     )
     .expect("failed to write python fixture");
 
-    let default_output = successful_stdout(run_treebrief(&file));
-    let explicit_output = successful_stdout(run_treebrief_with_args(
-        &file,
-        &["--show-top-level-symbols"],
-    ));
+    let default_output = successful_stdout(run_uberview(&file));
+    let explicit_output =
+        successful_stdout(run_uberview_with_args(&file, &["--show-top-level-symbols"]));
 
     assert!(!default_output.contains("Skipped top-level assignments/constants"));
     assert!(!default_output.contains("Assignment: A"));
@@ -427,7 +425,7 @@ fn plain_top_level_comments_are_not_swallowed_by_omitted_symbols() {
     std::fs::write(&file, "# module context\nA = 1\nB = 2\n")
         .expect("failed to write python fixture");
 
-    let output = successful_stdout(run_treebrief(&file));
+    let output = successful_stdout(run_uberview(&file));
 
     assert!(output.contains("# module context"));
     assert!(!output.contains("Skipped top-level assignments/constants"));
@@ -447,7 +445,7 @@ fn omitted_runtime_scope_indentation_collapses_to_retained_container_depth() {
     )
     .expect("failed to write python fixture");
 
-    let output = successful_stdout(run_treebrief(&file));
+    let output = successful_stdout(run_uberview(&file));
 
     assert!(output.contains("    # Keep only the retained depth."));
     assert!(!output.contains("        # Keep only the retained depth."));
@@ -468,7 +466,7 @@ fn decorated_python_method_keeps_method_label() {
     )
     .expect("failed to write python fixture");
 
-    let output = successful_stdout(run_treebrief(&file));
+    let output = successful_stdout(run_uberview(&file));
 
     assert!(output.contains("[1-4] Class: Example"));
     assert!(output.contains("    [2-4] Method: build"));
@@ -479,12 +477,12 @@ fn decorated_python_method_keeps_method_label() {
 fn concurrent_runs_produce_identical_output() {
     // Compare whole-process output so parallel safety is checked at the product boundary.
     let target = fixture_path("sample_project");
-    let expected = successful_stdout(run_treebrief(&target));
+    let expected = successful_stdout(run_uberview(&target));
 
     let handles = (0..4)
         .map(|_| {
             let target = target.clone();
-            thread::spawn(move || successful_stdout(run_treebrief(&target)))
+            thread::spawn(move || successful_stdout(run_uberview(&target)))
         })
         .collect::<Vec<_>>();
 

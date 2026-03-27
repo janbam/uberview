@@ -2,7 +2,7 @@
 
 # Module context that should stay.
 
-DEFAULT_NAME = "treebrief"
+DEFAULT_NAME = "uberview"
 
 
 @cache
