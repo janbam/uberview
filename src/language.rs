@@ -56,7 +56,10 @@ pub fn detect_language(path: &Path, sniff: Option<&str>) -> Option<LanguageKind>
 
 /// Determine whether a path could plausibly be a supported source file.
 pub fn maybe_supported_path(path: &Path) -> bool {
-    path.extension().is_some() || path.file_name().is_some()
+    // Avoid opening obviously unsupported extensions during directory scans.
+    detect_by_extension(path.extension()).is_some()
+        || detect_by_filename(path.file_name()).is_some()
+        || path.extension().is_none()
 }
 
 /// Require a supported language for one concrete input file.
@@ -120,4 +123,29 @@ pub fn parse_source(parser: &mut Parser, source: &str) -> Result<tree_sitter::Tr
     parser
         .parse(source, None)
         .context("tree-sitter did not return a syntax tree")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{LanguageKind, detect_language, maybe_supported_path};
+    use std::path::Path;
+
+    /// Verify that the fast directory-scan prefilter excludes obviously unsupported extensions.
+    #[test]
+    fn maybe_supported_path_filters_by_supported_extensions_or_extensionless_files() {
+        // Keep extensionless files eligible for shebang sniffing but prune unrelated extensions early.
+        assert!(maybe_supported_path(Path::new("main.py")));
+        assert!(maybe_supported_path(Path::new("script")));
+        assert!(!maybe_supported_path(Path::new("README.md")));
+        assert!(!maybe_supported_path(Path::new("data.json")));
+    }
+
+    /// Verify that extensionless files still fall through to shebang-based detection.
+    #[test]
+    fn detect_language_uses_shebang_for_extensionless_files() {
+        // Ensure the prefilter tightening does not regress shebang support.
+        let language = detect_language(Path::new("tool"), Some("#!/usr/bin/env python3\n"));
+
+        assert_eq!(language, Some(LanguageKind::Python));
+    }
 }
