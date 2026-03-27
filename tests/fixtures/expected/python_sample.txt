@@ -10,6 +10,7 @@ def top_level(
 ) -> int:
     """Handle the top-level case."""
     # Normalize before branching.
+
     [14-16] Function: nested
     def nested(value: int) -> int:
         # Leave the nested exit visible.
@@ -22,6 +23,7 @@ def stream_names(names: list[str]):
 [30-39] Class: Greeter
 class Greeter:
     """Greeter docs."""
+
     [33-39] Method: load_many
     async def load_many(
         self,

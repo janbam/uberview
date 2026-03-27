@@ -45,7 +45,7 @@ impl SourceText {
         TextSpan::new(span.start_byte, end)
     }
 
-    /// Return normalized output lines for a retained span.
+    /// Return normalized output lines for a retained span with any shared left margin removed.
     pub fn rendered_lines(&self, span: TextSpan) -> Vec<String> {
         // Normalize only the trailing line breaks and trailing whitespace allowed by the spec.
         let trimmed = self.trim_trailing_line_breaks(span);
@@ -69,6 +69,9 @@ impl SourceText {
         while lines.last().is_some_and(|line| line.is_empty()) {
             lines.pop();
         }
+
+        // Drop the shared source-side margin so rendering can re-indent purely by retained depth.
+        strip_shared_indentation(&mut lines);
 
         lines
     }
@@ -110,4 +113,53 @@ impl SourceText {
             .partition_point(|offset| *offset <= bounded);
         self.line_starts[line_index.saturating_sub(1)]
     }
+}
+
+/// Remove the common leading whitespace prefix from every non-empty line in one retained block.
+fn strip_shared_indentation(lines: &mut [String]) {
+    let Some(prefix) = shared_indentation_prefix(lines).filter(|prefix| !prefix.is_empty()) else {
+        return;
+    };
+
+    // Strip only the block-wide margin so internal multiline layout remains intact.
+    for line in lines.iter_mut().filter(|line| !line.is_empty()) {
+        if let Some(stripped) = line.strip_prefix(&prefix) {
+            *line = stripped.to_owned();
+        }
+    }
+}
+
+/// Return the whitespace-only prefix shared by every non-empty line in one retained block.
+fn shared_indentation_prefix(lines: &[String]) -> Option<String> {
+    let mut shared: Option<String> = None;
+
+    // Intersect the line-leading indentation so omitted runtime scopes stop affecting output depth.
+    for line in lines.iter().filter(|line| !line.is_empty()) {
+        let indentation = line
+            .chars()
+            .take_while(|character| matches!(character, ' ' | '\t'))
+            .collect::<String>();
+
+        shared = Some(match shared {
+            Some(current) => common_prefix(&current, &indentation),
+            None => indentation,
+        });
+
+        if shared.as_ref().is_some_and(|prefix| prefix.is_empty()) {
+            break;
+        }
+    }
+
+    shared
+}
+
+/// Return the longest shared byte-prefix between two whitespace strings.
+fn common_prefix(left: &str, right: &str) -> String {
+    let prefix_len = left
+        .bytes()
+        .zip(right.bytes())
+        .take_while(|(left, right)| left == right)
+        .count();
+
+    left[..prefix_len].to_owned()
 }

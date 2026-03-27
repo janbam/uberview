@@ -8,6 +8,7 @@ Tickets captured on 2026-03-27 after reviewing TreeBrief output for `/home/jan/w
 
 ## Completed
 
+- TB-005 Remove source-scope indentation noise and re-indent output by retained container depth. Closed on 2026-03-27 after validating the dedented rendering contract, blank-line separation before nested multiline container headers, fixture snapshots, and the hidden-scope indentation regression test.
 - TB-004 Accept multiple input paths with stable ordering and deduplication. Closed on 2026-03-27 after validating mixed file and directory inputs, normalized-path deduplication, and the `proposals.py` overlap case against the real services directory.
 - TB-003 Hide top-level assignments by default and replace them with consolidated skipped-range markers. Closed on 2026-03-27 after validating the placeholder behavior and the `--show-top-level-symbols` escape hatch against fixtures and `proposals.py`.
 - TB-002 Make return rendering opt-in and limit it to true returns. Closed on 2026-03-27 after validating the default suppression and `--show-returns` behavior against fixtures and `proposals.py`.

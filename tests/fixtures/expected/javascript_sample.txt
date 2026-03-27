@@ -4,9 +4,10 @@
 // Exported helper context.
 [4-11] Function: greet
 export function greet(name) {
-  /** Normalize before returning. */
-  [6-8] Function: normalize
-  function normalize(value) {
+    /** Normalize before returning. */
+
+    [6-8] Function: normalize
+    function normalize(value) {
 
 
 /** Builder docs. */
@@ -14,11 +15,12 @@ export function greet(name) {
 export const buildGreeter = (
   prefix,
 ) => {
-  // Reject empty prefixes.
+    // Reject empty prefixes.
 
 [25-31] Class: Greeter
 class Greeter {
-  /** Format one name. */
-  [27-30] Method: format
-  format(name) {
-    // Keep the method exit.
+    /** Format one name. */
+
+    [27-30] Method: format
+    format(name) {
+        // Keep the method exit.

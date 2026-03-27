@@ -165,8 +165,10 @@ class ProposalService(BaseService):
 - Output inside a file is strictly in source order
 - Every retained definition block starts with `[start-end] Kind: name`
 - Single-line ranges collapse to `[n]`
-- Nested definition headers keep their source indentation
+- Retained container nesting uses renderer-owned indentation, one level per retained scope
+- Original indentation caused only by omitted runtime scopes is removed before rendering
 - The retained signature and decorators follow the synthetic header as source text
+- Nested retained containers get one blank line before their synthetic header
 - One blank line follows each retained definition block
 - Non-definition retained lines do not carry line numbers by default
 - `--show-line-numbers-for-all-items` extends bracketed line numbers to all retained snippets
@@ -321,11 +323,12 @@ That means:
 
 - preserve original token text for comments, docstrings, and retained returns
 - preserve multiline definitions as written
-- preserve nesting and relative indentation
+- preserve retained nesting while allowing rendering-owned indentation
 
 Some normalization is acceptable:
 
-- indentation may be shifted uniformly so nested output remains readable
+- shared leading indentation may be removed so omitted scopes stop affecting rendered depth
+- retained container depth may be rendered with one uniform indent step per level
 - trailing whitespace may be removed
 - line endings may be normalized
 

@@ -68,7 +68,9 @@ Rules:
 - the retained signature and decorators stay below the synthetic header in source-like form
 - retained definition blocks are separated by one blank line
 - retained content stays in source order
-- nested retained items keep their relative indentation
+- retained container nesting adds one renderer-owned indent level per scope
+- original indentation caused only by omitted runtime scopes is stripped before rendering
+- nested retained containers gain a blank line before their synthetic header
 - non-definition retained lines stay unnumbered by default
 - `--show-line-numbers-for-all-items` extends bracketed line numbers to all retained items
 - default output omits return-like control-flow lines

@@ -228,7 +228,7 @@ fn show_line_numbers_for_all_items_numbers_snippets_too() {
     assert!(output.contains("[1] \"\"\"Python module docs.\"\"\""));
     assert!(output.contains("[3] # Module context that should stay."));
     assert!(output.contains("    [12] \"\"\"Handle the top-level case.\"\"\""));
-    assert!(output.contains("    [15] # Leave the nested exit visible."));
+    assert!(output.contains("        [15] # Leave the nested exit visible."));
     assert!(output.contains("    [25] # Yield the normalized values."));
     assert!(!output.contains("return value + 1"));
     assert!(!output.contains("return [name.upper() for name in names]"));
@@ -431,6 +431,27 @@ fn plain_top_level_comments_are_not_swallowed_by_symbol_placeholders() {
 
     assert!(output.contains("# module context"));
     assert!(output.contains("[2-3] Skipped top-level assignments/constants (2 items)"));
+}
+
+/// Verify that omitted runtime-scope indentation does not leak into retained body output.
+#[test]
+fn omitted_runtime_scope_indentation_collapses_to_retained_container_depth() {
+    // Keep indentation tied only to retained containers so hidden `if` blocks do not skew the map.
+    let temp = tempdir().expect("failed to create temporary directory");
+    let file = temp.path().join("hidden_scope_indent.py");
+    std::fs::write(
+        &file,
+        "def outer(flag):\n    if flag:\n        # Keep only the retained depth.\n        def nested():\n            # Nested comment.\n            return 1\n",
+    )
+    .expect("failed to write python fixture");
+
+    let output = successful_stdout(run_treebrief(&file));
+
+    assert!(output.contains("    # Keep only the retained depth."));
+    assert!(!output.contains("        # Keep only the retained depth."));
+    assert!(output.contains("\n\n    [4-6] Function: nested"));
+    assert!(!output.contains("\n\n        [4-6] Function: nested"));
+    assert!(output.contains("        # Nested comment."));
 }
 
 /// Verify that decorated methods still read as methods instead of plain functions.

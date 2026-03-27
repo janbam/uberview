@@ -3,11 +3,11 @@
 /** TypeScript API docs. */
 [2-5] Interface: Service
 export interface Service {
-  [3] Method: run
-  run(input: string): string
+    [3] Method: run
+    run(input: string): string
 
-  [4] Property: version
-  readonly version: string
+    [4] Property: version
+    readonly version: string
 
 
 [7-9] Type Alias: Result
@@ -17,22 +17,24 @@ export type Result<T> =
 
 [11-18] Namespace: helpers
 export namespace helpers {
-  [12-17] Function: format
-  export const format = (
-    prefix: string,
-  ) => {
-    // Return the formatted label.
+
+    [12-17] Function: format
+    export const format = (
+      prefix: string,
+    ) => {
+        // Return the formatted label.
 
 
 [20-33] Class: Worker
 export class Worker {
-  [21] Field: kind
-  readonly kind: string = "worker"
+    [21] Field: kind
+    readonly kind: string = "worker"
 
-  [23-32] Method: execute
-  execute(
-    input: string,
-  ): string {
-    // Keep the nested helper.
-    [27-29] Function: normalize
-    function normalize(value: string): string {
+    [23-32] Method: execute
+    execute(
+      input: string,
+    ): string {
+        // Keep the nested helper.
+
+        [27-29] Function: normalize
+        function normalize(value: string): string {
