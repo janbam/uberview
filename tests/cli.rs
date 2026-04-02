@@ -93,6 +93,20 @@ fn python_single_file_matches_expected_output() {
     assert_eq!(output.trim_end(), expected.trim_end());
 }
 
+/// Verify the Markdown reduced-source contract on a representative single file.
+#[test]
+fn markdown_single_file_matches_expected_output() {
+    // Lock the CLI contract for heading-only structure, level nesting, and section-sized line ranges.
+    let output = successful_stdout(run_uberview(&fixture_path("sample_project/docs/guide.md")));
+    let expected = std::fs::read_to_string(fixture_path("expected/markdown_guide.txt"))
+        .expect("failed to read markdown expectation");
+
+    assert_eq!(output.trim_end(), expected.trim_end());
+    assert!(!output.contains("# Uberview Markdown"));
+    assert!(!output.contains("### Flags"));
+    assert!(!output.contains("Install And Run\n    ---------------"));
+}
+
 /// Verify the JavaScript reduced-source contract on a representative single file.
 #[test]
 fn javascript_single_file_matches_expected_output() {
@@ -141,6 +155,7 @@ fn directory_scan_is_deterministic_and_skips_default_ignored_dirs() {
     assert_in_order(
         &output,
         &[
+            "=== docs/guide.md ===",
             "=== scripts/python_tool ===",
             "=== src/javascript_sample.js ===",
             "=== src/python_broken.py ===",
@@ -152,6 +167,20 @@ fn directory_scan_is_deterministic_and_skips_default_ignored_dirs() {
     assert!(output.contains("!! parse failed: parse failed for src/python_broken.py:"));
     assert!(!output.contains("node_modules/ignored.js"));
     assert!(!output.contains("target/ignored.rs"));
+}
+
+/// Verify that Markdown files can be excluded from otherwise normal directory scans.
+#[test]
+fn exclude_markdown_omits_markdown_files_from_directory_scans() {
+    // Keep Markdown in the default scan while preserving an explicit code-only escape hatch.
+    let output = successful_stdout(run_uberview_with_args(
+        &fixture_path("sample_project"),
+        &["--exclude-markdown"],
+    ));
+
+    assert!(!output.contains("=== docs/guide.md ==="));
+    assert!(output.contains("=== scripts/python_tool ==="));
+    assert!(output.contains("=== src/python_sample.py ==="));
 }
 
 /// Verify that a broken single file fails clearly instead of pretending to be empty.
@@ -311,6 +340,7 @@ fn mixed_file_and_directory_inputs_keep_order_without_duplicates() {
         &output,
         &[
             "=== tests/fixtures/sample_project/src/python_sample.py ===",
+            "=== docs/guide.md ===",
             "=== scripts/python_tool ===",
             "=== src/javascript_sample.js ===",
             "=== src/python_broken.py ===",
@@ -345,6 +375,7 @@ fn normalized_file_input_deduplicates_against_later_directory_root() {
         &output,
         &[
             "=== tests/fixtures/sample_project/src/../src/python_sample.py ===",
+            "=== docs/guide.md ===",
             "=== scripts/python_tool ===",
             "=== src/javascript_sample.js ===",
             "=== src/python_broken.py ===",
@@ -383,6 +414,7 @@ fn overlapping_directory_roots_keep_stable_unique_order() {
             "=== python_sample.py ===",
             "=== rust_sample.rs ===",
             "=== typescript_sample.ts ===",
+            "=== docs/guide.md ===",
             "=== scripts/python_tool ===",
         ],
     );

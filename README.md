@@ -16,6 +16,7 @@ The output reads like reduced source, not metadata.
 ## Supported Languages
 
 - Python
+- Markdown
 - JavaScript
 - TypeScript and TSX
 - Rust
@@ -46,6 +47,7 @@ cargo run -- src/lib.rs src/app.rs
 cargo run -- --show-line-numbers-for-all-items src/lib.rs
 cargo run -- --show-returns src/lib.rs
 cargo run -- --show-top-level-symbols src/lib.rs
+cargo run -- --exclude-markdown .
 ```
 
 For a release-style local build:
@@ -77,6 +79,7 @@ Rules:
 - each retained definition starts with `[start-end] Kind: name`
 - single-line definition ranges collapse to `[n]`
 - the retained signature and decorators stay below the synthetic header in source-like form
+- Markdown heading definitions intentionally suppress the raw heading line when it would only repeat the synthetic header
 - retained definition blocks are separated by one blank line
 - retained content stays in source order
 - retained container nesting adds one renderer-owned indent level per scope
@@ -89,6 +92,8 @@ Rules:
 - default output keeps only structural container/callable definition headers plus comments and docstrings
 - standalone top-level assignment/constant-style symbols are omitted by default
 - `--show-top-level-symbols` restores those top-level symbol definitions explicitly
+- Markdown files are included in normal recursive directory scans by default
+- `--exclude-markdown` removes Markdown files from the current invocation
 - one invocation may accept several file and directory roots
 - output follows the caller's root order, then deterministic in-root ordering
 - overlapping inputs are deduplicated so each file section appears once
@@ -124,6 +129,7 @@ The test suite includes:
 
 - exact single-file output snapshots for all supported languages
 - deterministic directory-scan assertions
+- Markdown heading-structure assertions and Markdown opt-out coverage
 - shebang detection for extensionless scripts
 - opt-in return-surface assertions
 - syntax-recovery coverage
@@ -145,3 +151,5 @@ Notable v1 constraints:
 - no semantic resolution or type checking
 - no machine-readable output contract
 - no build-system awareness
+- Markdown is intentionally heading-only for now; ordinary prose blocks stay omitted
+- Markdown headings currently render as structure only; the raw `#` / setext heading text is intentionally not echoed under the synthetic line

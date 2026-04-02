@@ -24,6 +24,12 @@ pub fn run(cli: Cli) -> Result<()> {
 
     match targets.as_slice() {
         [InputTarget::File(file)] => {
+            // Respect language exclusions even for explicit single-file invocations.
+            if should_exclude_file(file, &cli) {
+                println!("No supported files found.");
+                return Ok(());
+            }
+
             // Fail the whole run for a single-file invocation so an empty output never hides an error.
             let section = parse_file_strict(file, extract_options)?;
             println!(
@@ -32,7 +38,7 @@ pub fn run(cli: Cli) -> Result<()> {
             );
         }
         _ => {
-            let files = collect_input_files(targets)?;
+            let files = collect_input_files(targets, &cli)?;
             if files.is_empty() {
                 println!("No supported files found.");
                 return Ok(());
@@ -52,23 +58,35 @@ pub fn run(cli: Cli) -> Result<()> {
 }
 
 /// Expand the resolved CLI targets into one deduplicated, source-ordered file list.
-fn collect_input_files(targets: Vec<InputTarget>) -> Result<Vec<DiscoveredFile>> {
+fn collect_input_files(targets: Vec<InputTarget>, cli: &Cli) -> Result<Vec<DiscoveredFile>> {
     let mut files = Vec::new();
     let mut seen_paths = HashSet::new();
 
     // Respect the user-provided root order while deduplicating concrete files across overlaps.
     for target in targets {
         match target {
-            InputTarget::File(file) => push_unique_file(file, &mut seen_paths, &mut files),
+            InputTarget::File(file) => {
+                if !should_exclude_file(&file, cli) {
+                    push_unique_file(file, &mut seen_paths, &mut files);
+                }
+            }
             InputTarget::Directory(root) => {
                 for file in discover_directory_files(&root)? {
-                    push_unique_file(file, &mut seen_paths, &mut files);
+                    if !should_exclude_file(&file, cli) {
+                        push_unique_file(file, &mut seen_paths, &mut files);
+                    }
                 }
             }
         }
     }
 
     Ok(files)
+}
+
+/// Decide whether one discovered file should be skipped by the current CLI filters.
+fn should_exclude_file(file: &DiscoveredFile, cli: &Cli) -> bool {
+    // Keep Markdown opt-out centralized so single-file and directory flows agree.
+    cli.exclude_markdown && file.language == crate::language::LanguageKind::Markdown
 }
 
 /// Keep only the first occurrence of each concrete file path across all resolved roots.
