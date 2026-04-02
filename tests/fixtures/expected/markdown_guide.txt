@@ -1,0 +1,11 @@
+=== tests/fixtures/sample_project/docs/guide.md ===
+
+[1-10] Heading: Uberview Markdown
+
+    [4-10] Heading: Install And Run
+
+        [8-10] Heading: Flags
+
+[11-17] Heading: Output Contract
+
+    [15-17] Heading: Edge Cases

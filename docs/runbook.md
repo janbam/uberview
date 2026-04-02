@@ -20,6 +20,12 @@ For a quick manual smoke test:
 cargo run -- tests/fixtures/sample_project
 ```
 
+For a code-only smoke test that ignores Markdown files:
+
+```bash
+cargo run -- --exclude-markdown tests/fixtures/sample_project
+```
+
 ## Release Build
 
 Build the optimized binary locally:
@@ -45,6 +51,7 @@ target/release/uberview
 ### A directory scan seems incomplete
 
 - Confirm the missing file is not under a default ignored directory such as `target/` or `node_modules/`.
+- Confirm Markdown was not intentionally excluded with `--exclude-markdown`.
 - Check whether the file is extensionless and lacks a supported shebang.
 - Run the CLI directly on the file to isolate detection from traversal.
 

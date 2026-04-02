@@ -107,10 +107,6 @@ fn render_definition(
     depth: usize,
     lines: &mut Vec<String>,
 ) {
-    let header_lines = section.source.rendered_lines(definition.header_span);
-    let signature_end = header_signature_end(&header_lines);
-    let (signature_lines, trailing_header_lines) = header_lines.split_at(signature_end + 1);
-
     // Separate nested containers from prior body content so their headers scan as structure, not prose.
     if should_precede_nested_container_with_blank_line(definition, depth, lines) {
         push_blank_line_if_needed(lines);
@@ -129,15 +125,23 @@ fn render_definition(
         definition.kind.label(),
         definition.name
     ));
-    push_indented_lines(signature_lines, depth, lines);
-    render_trailing_header_lines(
-        definition,
-        signature_end,
-        trailing_header_lines,
-        options,
-        depth,
-        lines,
-    );
+
+    // Let callers suppress raw header echoing when the synthetic line already says everything useful.
+    if definition.render_header_source {
+        let header_lines = section.source.rendered_lines(definition.header_span);
+        let signature_end = header_signature_end(&header_lines);
+        let (signature_lines, trailing_header_lines) = header_lines.split_at(signature_end + 1);
+
+        push_indented_lines(signature_lines, depth, lines);
+        render_trailing_header_lines(
+            definition,
+            signature_end,
+            trailing_header_lines,
+            options,
+            depth,
+            lines,
+        );
+    }
 
     // Keep nested retained items immediately after the header so source order stays intact.
     for item in &definition.items {

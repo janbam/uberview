@@ -1,4 +1,5 @@
 mod javascript;
+mod markdown;
 mod python;
 mod rust;
 use anyhow::{Result, bail};
@@ -26,6 +27,11 @@ pub fn extract_file(
     language: LanguageKind,
     options: ExtractOptions,
 ) -> Result<FileSection> {
+    // Give Markdown a dedicated section builder because heading nesting is level-driven, not AST-body-driven.
+    if language == LanguageKind::Markdown {
+        return markdown::extract_file(display_path, source);
+    }
+
     // Parse once up front so the extraction pass can stay purely structural.
     let source = SourceText::new(source);
     let mut parser = Parser::new();
@@ -154,6 +160,7 @@ fn build_definition(
         leading_comment_snippets: Vec::new(),
         span: capture.span,
         header_span: source.trim_trailing_line_breaks(capture.header_span),
+        render_header_source: true,
         line_range: LineRange { start, end },
         items,
     }
@@ -186,6 +193,7 @@ fn should_retain_definition(kind: DefinitionKind, options: ExtractOptions) -> bo
         }
         DefinitionKind::Class
         | DefinitionKind::Function
+        | DefinitionKind::Heading
         | DefinitionKind::Impl
         | DefinitionKind::Interface
         | DefinitionKind::Method
@@ -355,6 +363,7 @@ fn capture_definition<'tree>(
     source: &SourceText,
 ) -> Option<DefinitionCapture<'tree>> {
     match language {
+        LanguageKind::Markdown => None,
         LanguageKind::Python => python::capture_definition(node, source),
         LanguageKind::JavaScript | LanguageKind::TypeScript | LanguageKind::Tsx => {
             javascript::capture_definition(language, node, source)
@@ -370,6 +379,7 @@ fn capture_snippet(
     options: ExtractOptions,
 ) -> Option<TextSpan> {
     match language {
+        LanguageKind::Markdown => None,
         LanguageKind::Python => python::capture_snippet(node, options),
         LanguageKind::JavaScript | LanguageKind::TypeScript | LanguageKind::Tsx => {
             javascript::capture_snippet(node, options)
@@ -381,6 +391,7 @@ fn capture_snippet(
 /// Dispatch comment-node detection to the active language adapter.
 fn is_comment_node(language: LanguageKind, node: Node<'_>) -> bool {
     match language {
+        LanguageKind::Markdown => false,
         LanguageKind::Python => python::is_comment_node(node),
         LanguageKind::JavaScript | LanguageKind::TypeScript | LanguageKind::Tsx => {
             javascript::is_comment_node(node)
@@ -392,6 +403,7 @@ fn is_comment_node(language: LanguageKind, node: Node<'_>) -> bool {
 /// Skip helper nodes that are retained as part of a surrounding definition header.
 fn should_skip_node(language: LanguageKind, node: Node<'_>) -> bool {
     match language {
+        LanguageKind::Markdown => false,
         LanguageKind::Python => python::should_skip_node(node),
         LanguageKind::JavaScript | LanguageKind::TypeScript | LanguageKind::Tsx => {
             javascript::should_skip_node(node)

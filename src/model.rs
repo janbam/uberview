@@ -48,6 +48,8 @@ pub enum DefinitionKind {
     Field,
     /// A function-like declaration.
     Function,
+    /// A Markdown heading section.
+    Heading,
     /// An implementation block.
     Impl,
     /// An interface declaration.
@@ -84,6 +86,7 @@ impl DefinitionKind {
             Self::Enum => "Enum",
             Self::Field => "Field",
             Self::Function => "Function",
+            Self::Heading => "Heading",
             Self::Impl => "Impl",
             Self::Interface => "Interface",
             Self::Macro => "Macro",
@@ -158,6 +161,8 @@ pub struct Definition {
     pub span: TextSpan,
     /// The source slice used for the retained header line(s).
     pub header_span: TextSpan,
+    /// Decide whether the renderer should echo the retained header source under the synthetic line.
+    pub render_header_source: bool,
     /// The line coordinates printed alongside the definition header.
     pub line_range: LineRange,
     /// The retained nested items inside the definition body.

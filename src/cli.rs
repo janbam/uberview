@@ -18,6 +18,9 @@ pub struct Cli {
     /// Restore explicit top-level assignment and constant-style symbol definitions.
     #[arg(long)]
     pub show_top_level_symbols: bool,
+    /// Skip Markdown files during analysis, including recursive directory scans.
+    #[arg(long)]
+    pub exclude_markdown: bool,
     /// One or more files or directories to analyze.
     /// Directory inputs render file headers relative to each provided root.
     #[arg(required = true)]

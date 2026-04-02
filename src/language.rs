@@ -6,6 +6,8 @@ use tree_sitter::{Language, Parser};
 /// The supported source languages.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum LanguageKind {
+    /// Markdown source files.
+    Markdown,
     /// Python source files.
     Python,
     /// JavaScript source files.
@@ -22,6 +24,7 @@ impl LanguageKind {
     /// Return the tree-sitter grammar for this language.
     pub fn grammar(self) -> Language {
         match self {
+            Self::Markdown => tree_sitter_md::LANGUAGE.into(),
             Self::Python => tree_sitter_python::LANGUAGE.into(),
             Self::JavaScript => tree_sitter_javascript::LANGUAGE.into(),
             Self::TypeScript => tree_sitter_typescript::LANGUAGE_TYPESCRIPT.into(),
@@ -73,6 +76,7 @@ fn detect_by_extension(extension: Option<&OsStr>) -> Option<LanguageKind> {
     let extension = extension.and_then(OsStr::to_str)?;
 
     match extension {
+        "md" => Some(LanguageKind::Markdown),
         "py" => Some(LanguageKind::Python),
         "js" | "jsx" | "mjs" | "cjs" => Some(LanguageKind::JavaScript),
         "ts" | "mts" | "cts" => Some(LanguageKind::TypeScript),
@@ -134,9 +138,9 @@ mod tests {
     #[test]
     fn maybe_supported_path_filters_by_supported_extensions_or_extensionless_files() {
         // Keep extensionless files eligible for shebang sniffing but prune unrelated extensions early.
+        assert!(maybe_supported_path(Path::new("README.md")));
         assert!(maybe_supported_path(Path::new("main.py")));
         assert!(maybe_supported_path(Path::new("script")));
-        assert!(!maybe_supported_path(Path::new("README.md")));
         assert!(!maybe_supported_path(Path::new("data.json")));
     }
 
