@@ -5,9 +5,21 @@ use std::fs as std_fs;
 
 use crate::cli::Cli;
 use crate::extract::{self, ExtractOptions};
-use crate::fs::{DiscoveredFile, InputTarget, discover_directory_files, resolve_inputs};
+use crate::fs::{
+    DiscoveredFile, InputTarget, ResolvedInput, discover_directory_files, resolve_input,
+    resolve_inputs_lenient,
+};
 use crate::model::{FileFailure, FileOutput, FileSection};
 use crate::render::{self, RenderOptions};
+
+/// One ordered multi-input output slot, either ready now or waiting on file parsing.
+#[derive(Debug)]
+enum OutputWorkItem {
+    /// A ready-to-render non-fatal failure discovered before parsing.
+    Ready(FileOutput),
+    /// A source file that should still flow through the lenient parse path.
+    Pending(DiscoveredFile),
+}
 
 /// Run TreeBrief for the parsed CLI input.
 pub fn run(cli: Cli) -> Result<()> {
@@ -20,67 +32,84 @@ pub fn run(cli: Cli) -> Result<()> {
         show_top_level_symbols: cli.show_top_level_symbols,
     };
 
-    let targets = resolve_inputs(&cli.paths)?;
-
-    match targets.as_slice() {
-        [InputTarget::File(file)] => {
+    // Keep the true single-file path loud so an explicit broken file never looks like a partial success.
+    if let [path] = cli.paths.as_slice() {
+        if let InputTarget::File(file) = resolve_input(path)? {
             // Respect language exclusions even for explicit single-file invocations.
-            if should_exclude_file(file, &cli) {
+            if should_exclude_file(&file, &cli) {
                 println!("No supported files found.");
                 return Ok(());
             }
 
-            // Fail the whole run for a single-file invocation so an empty output never hides an error.
-            let section = parse_file_strict(file, extract_options)?;
+            let section = parse_file_strict(&file, extract_options)?;
             println!(
                 "{}",
                 render::render_output(&FileOutput::Section(section), render_options)
             );
-        }
-        _ => {
-            let files = collect_input_files(targets, &cli)?;
-            if files.is_empty() {
-                println!("No supported files found.");
-                return Ok(());
-            }
-
-            // Keep the discovery order stable while parallelizing the parse and extraction work.
-            let outputs = files
-                .par_iter()
-                .map(|file| parse_file_lenient(file, extract_options))
-                .collect::<Vec<_>>();
-
-            println!("{}", render::render_outputs(&outputs, render_options));
+            return Ok(());
         }
     }
+
+    let work_items = collect_output_work(resolve_inputs_lenient(&cli.paths), &cli);
+    if work_items.is_empty() {
+        println!("No supported files found.");
+        return Ok(());
+    }
+
+    // Keep the discovery order stable while parallelizing only the file-local parse and extraction work.
+    let outputs = work_items
+        .into_par_iter()
+        .map(|item| match item {
+            OutputWorkItem::Ready(output) => output,
+            OutputWorkItem::Pending(file) => parse_file_lenient(&file, extract_options),
+        })
+        .collect::<Vec<_>>();
+
+    println!("{}", render::render_outputs(&outputs, render_options));
 
     Ok(())
 }
 
-/// Expand the resolved CLI targets into one deduplicated, source-ordered file list.
-fn collect_input_files(targets: Vec<InputTarget>, cli: &Cli) -> Result<Vec<DiscoveredFile>> {
-    let mut files = Vec::new();
+/// Expand the resolved CLI targets into one ordered stream of rendered failures and parse work.
+fn collect_output_work(inputs: Vec<ResolvedInput>, cli: &Cli) -> Vec<OutputWorkItem> {
+    let mut work_items = Vec::new();
     let mut seen_paths = HashSet::new();
 
-    // Respect the user-provided root order while deduplicating concrete files across overlaps.
-    for target in targets {
-        match target {
-            InputTarget::File(file) => {
-                if !should_exclude_file(&file, cli) {
-                    push_unique_file(file, &mut seen_paths, &mut files);
-                }
+    // Respect the user-provided root order while keeping target-local failures inline.
+    for input in inputs {
+        match input {
+            ResolvedInput::Failure(failure) => {
+                work_items.push(OutputWorkItem::Ready(FileOutput::Failure(failure)));
             }
-            InputTarget::Directory(root) => {
-                for file in discover_directory_files(&root)? {
+            ResolvedInput::Target(target) => match target {
+                InputTarget::File(file) => {
                     if !should_exclude_file(&file, cli) {
-                        push_unique_file(file, &mut seen_paths, &mut files);
+                        push_unique_file(file, &mut seen_paths, &mut work_items);
                     }
                 }
-            }
+                InputTarget::Directory {
+                    actual_path,
+                    display_path,
+                } => match discover_directory_files(&actual_path) {
+                    Ok(files) => {
+                        for file in files {
+                            if !should_exclude_file(&file, cli) {
+                                push_unique_file(file, &mut seen_paths, &mut work_items);
+                            }
+                        }
+                    }
+                    Err(error) => {
+                        work_items.push(OutputWorkItem::Ready(FileOutput::Failure(FileFailure {
+                            display_path,
+                            message: error.to_string(),
+                        })));
+                    }
+                },
+            },
         }
     }
 
-    Ok(files)
+    work_items
 }
 
 /// Decide whether one discovered file should be skipped by the current CLI filters.
@@ -93,10 +122,10 @@ fn should_exclude_file(file: &DiscoveredFile, cli: &Cli) -> bool {
 fn push_unique_file(
     file: DiscoveredFile,
     seen_paths: &mut HashSet<std::path::PathBuf>,
-    files: &mut Vec<DiscoveredFile>,
+    work_items: &mut Vec<OutputWorkItem>,
 ) {
     if seen_paths.insert(file.actual_path.clone()) {
-        files.push(file);
+        work_items.push(OutputWorkItem::Pending(file));
     }
 }
 

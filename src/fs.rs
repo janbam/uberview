@@ -5,6 +5,7 @@ use std::io::Read;
 use std::path::{Component, Path, PathBuf};
 
 use crate::language::{self, LanguageKind};
+use crate::model::FileFailure;
 
 /// One resolved input file ready for parsing.
 #[derive(Clone, Debug)]
@@ -23,16 +24,44 @@ pub enum InputTarget {
     /// A single supported source file.
     File(DiscoveredFile),
     /// A directory that should be scanned recursively.
-    Directory(PathBuf),
+    Directory {
+        /// The canonical root path used for filesystem traversal.
+        actual_path: PathBuf,
+        /// The path shown when the directory root itself fails.
+        display_path: String,
+    },
 }
 
-/// Resolve every user-provided input in order.
-pub fn resolve_inputs(paths: &[PathBuf]) -> Result<Vec<InputTarget>> {
-    paths.iter().map(|path| resolve_input(path)).collect()
+/// One resolved CLI input, including non-fatal failures for multi-input runs.
+#[derive(Debug)]
+pub enum ResolvedInput {
+    /// A successfully resolved file or directory target.
+    Target(InputTarget),
+    /// A target-level failure that should render inline instead of aborting a multi-input run.
+    Failure(FileFailure),
+}
+
+/// Resolve one CLI input strictly for the single-file path that should still fail loudly.
+pub fn resolve_input(path: &Path) -> Result<InputTarget> {
+    resolve_input_target(path)
+}
+
+/// Resolve every CLI input while downgrading per-target failures into inline output.
+pub fn resolve_inputs_lenient(paths: &[PathBuf]) -> Vec<ResolvedInput> {
+    paths
+        .iter()
+        .map(|path| match resolve_input_target(path) {
+            Ok(target) => ResolvedInput::Target(target),
+            Err(error) => ResolvedInput::Failure(FileFailure {
+                display_path: display_requested_path(path),
+                message: error.to_string(),
+            }),
+        })
+        .collect()
 }
 
 /// Resolve the user-provided path into either a single file target or a directory scan root.
-fn resolve_input(path: &Path) -> Result<InputTarget> {
+fn resolve_input_target(path: &Path) -> Result<InputTarget> {
     // Resolve relative inputs once so later file IO is independent of the caller's cwd.
     let requested_path = if path.is_absolute() {
         path.to_path_buf()
@@ -52,7 +81,10 @@ fn resolve_input(path: &Path) -> Result<InputTarget> {
     })?;
 
     if metadata.is_dir() {
-        return Ok(InputTarget::Directory(actual_path));
+        return Ok(InputTarget::Directory {
+            actual_path: actual_path.clone(),
+            display_path: display_single_file(path, &actual_path),
+        });
     }
 
     if !metadata.is_file() {
@@ -61,7 +93,7 @@ fn resolve_input(path: &Path) -> Result<InputTarget> {
 
     let language = detect_language_for_file(&actual_path)?
         .with_context(|| format!("unsupported source file: {}", actual_path.to_string_lossy()))?;
-    let display_path = display_single_file(path, &actual_path)?;
+    let display_path = display_single_file(path, &actual_path);
 
     Ok(InputTarget::File(DiscoveredFile {
         actual_path,
@@ -169,17 +201,38 @@ fn should_skip_path(path: &Path) -> bool {
 }
 
 /// Choose a stable display path for single-file invocations.
-fn display_single_file(input: &Path, actual_path: &Path) -> Result<String> {
+fn display_single_file(input: &Path, actual_path: &Path) -> String {
     if !input.is_absolute() {
-        return Ok(input.to_string_lossy().to_string());
+        return input.to_string_lossy().to_string();
     }
 
     // Prefer a cwd-relative rendering when the user passed an absolute path from nearby.
-    let cwd = std::env::current_dir().context("failed to resolve current working directory")?;
+    let Ok(cwd) = std::env::current_dir() else {
+        return actual_path.to_string_lossy().to_string();
+    };
 
-    Ok(actual_path
+    actual_path
         .strip_prefix(&cwd)
         .unwrap_or(actual_path)
         .to_string_lossy()
-        .to_string())
+        .to_string()
+}
+
+/// Choose a stable display path even when target resolution fails before canonicalization succeeds.
+fn display_requested_path(input: &Path) -> String {
+    if !input.is_absolute() {
+        return input.to_string_lossy().to_string();
+    }
+
+    // Prefer a cwd-relative rendering when the failing input still lives under the current workspace.
+    let display_path = fs::canonicalize(input).unwrap_or_else(|_| input.to_path_buf());
+    let Ok(cwd) = std::env::current_dir() else {
+        return display_path.to_string_lossy().to_string();
+    };
+
+    display_path
+        .strip_prefix(&cwd)
+        .unwrap_or(&display_path)
+        .to_string_lossy()
+        .to_string()
 }
