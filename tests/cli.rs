@@ -28,14 +28,24 @@ fn binary_path() -> &'static str {
 
 /// Run Uberview for one input path and capture the full process output.
 fn run_uberview(path: &Path) -> Output {
-    run_uberview_with_args(path, &[])
+    run_uberview_for_inputs(&[path])
 }
 
 /// Run Uberview for one input path plus extra CLI flags.
 fn run_uberview_with_args(path: &Path, args: &[&str]) -> Output {
+    run_uberview_for_inputs_with_args(&[path], args)
+}
+
+/// Run Uberview for several input paths and capture the full process output.
+fn run_uberview_for_inputs(paths: &[&Path]) -> Output {
+    run_uberview_for_inputs_with_args(paths, &[])
+}
+
+/// Run Uberview for several input paths plus extra CLI flags.
+fn run_uberview_for_inputs_with_args(paths: &[&Path], args: &[&str]) -> Output {
     // Build the command explicitly so flag-based contract tests hit the real binary surface.
     let mut command = Command::new(binary_path());
-    command.args(args).arg(path);
+    command.args(args).args(paths.iter().copied());
     command.output().expect("failed to run uberview")
 }
 
@@ -167,6 +177,33 @@ fn directory_scan_is_deterministic_and_skips_default_ignored_dirs() {
     assert!(output.contains("!! parse failed: parse failed for src/python_broken.py:"));
     assert!(!output.contains("node_modules/ignored.js"));
     assert!(!output.contains("target/ignored.rs"));
+}
+
+/// Verify that unsupported explicit inputs stay inline and do not abort later valid files.
+#[test]
+fn unsupported_explicit_file_does_not_abort_multi_input_run() {
+    // Keep multi-input runs productive even when one explicit path cannot resolve to a supported source file.
+    let unsupported = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("Cargo.toml");
+    let supported = fixture_path("sample_project/src/python_sample.py");
+    let output = successful_stdout(run_uberview_for_inputs(&[
+        unsupported.as_path(),
+        supported.as_path(),
+    ]));
+    let unsupported_header = "=== Cargo.toml ===";
+    let supported_header = format!(
+        "=== {} ===",
+        fixture_display_path("sample_project/src/python_sample.py")
+    );
+
+    assert_in_order(
+        &output,
+        &[
+            unsupported_header,
+            "!! parse failed: unsupported source file:",
+            supported_header.as_str(),
+            "[8-21] Function: top_level",
+        ],
+    );
 }
 
 /// Verify that Markdown files can be excluded from otherwise normal directory scans.
