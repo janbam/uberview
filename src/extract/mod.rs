@@ -18,6 +18,8 @@ pub struct ExtractOptions {
     pub show_returns: bool,
     /// Restore explicit top-level symbol definitions instead of collapsing them into placeholders.
     pub show_top_level_symbols: bool,
+    /// Omit plain comments while preserving language-native documentation text.
+    pub hide_comments: bool,
 }
 
 /// Extract a rendered file section from one source file.
@@ -127,7 +129,7 @@ fn walk_children(
             continue;
         }
 
-        if let Some(span) = capture_snippet(language, child, options) {
+        if let Some(span) = capture_snippet(language, child, source, options) {
             items.push(Item::Snippet(Snippet { span }));
             continue;
         }
@@ -376,16 +378,27 @@ fn capture_definition<'tree>(
 fn capture_snippet(
     language: LanguageKind,
     node: Node<'_>,
+    source: &SourceText,
     options: ExtractOptions,
 ) -> Option<TextSpan> {
-    match language {
+    let span = match language {
         LanguageKind::Markdown => None,
         LanguageKind::Python => python::capture_snippet(node, options),
         LanguageKind::JavaScript | LanguageKind::TypeScript | LanguageKind::Tsx => {
             javascript::capture_snippet(node, options)
         }
         LanguageKind::Rust => rust::capture_snippet(node, options),
+    }?;
+
+    // Let docstrings/doc-comments keep documenting structure while plain comments can disappear.
+    if options.hide_comments
+        && is_comment_node(language, node)
+        && !is_doc_comment(language, source, span)
+    {
+        return None;
     }
+
+    Some(span)
 }
 
 /// Dispatch comment-node detection to the active language adapter.
@@ -397,6 +410,25 @@ fn is_comment_node(language: LanguageKind, node: Node<'_>) -> bool {
             javascript::is_comment_node(node)
         }
         LanguageKind::Rust => rust::is_comment_node(node),
+    }
+}
+
+/// Decide whether a comment token carries language-native documentation.
+fn is_doc_comment(language: LanguageKind, source: &SourceText, span: TextSpan) -> bool {
+    let text = source.span_text(span).trim_start();
+
+    // Preserve only comment forms that conventionally document the following or enclosing symbol.
+    match language {
+        LanguageKind::JavaScript | LanguageKind::TypeScript | LanguageKind::Tsx => {
+            text.starts_with("/**")
+        }
+        LanguageKind::Rust => {
+            text.starts_with("///")
+                || text.starts_with("//!")
+                || text.starts_with("/**")
+                || text.starts_with("/*!")
+        }
+        LanguageKind::Python | LanguageKind::Markdown => false,
     }
 }
 

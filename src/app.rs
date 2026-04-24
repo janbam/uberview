@@ -30,6 +30,7 @@ pub fn run(cli: Cli) -> Result<()> {
     let extract_options = ExtractOptions {
         show_returns: cli.show_returns,
         show_top_level_symbols: cli.show_top_level_symbols,
+        hide_comments: cli.hide_comments,
     };
 
     // Keep the true single-file path loud so an explicit broken file never looks like a partial success.
