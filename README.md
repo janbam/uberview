@@ -90,6 +90,7 @@ Rules:
 - default output omits return-like control-flow lines
 - `--show-returns` restores actual `return` statements without restoring `raise`, `yield`, or `throw`
 - default output keeps only structural container/callable definition headers plus comments and docstrings
+- `--hide-comments` removes plain inline comments while keeping docstrings and documentation comments
 - standalone top-level assignment/constant-style symbols are omitted by default
 - `--show-top-level-symbols` restores those top-level symbol definitions explicitly
 - Markdown files are included in normal recursive directory scans by default

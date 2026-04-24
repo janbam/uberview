@@ -300,6 +300,44 @@ fn show_line_numbers_for_all_items_numbers_snippets_too() {
     assert!(!output.contains("return [name.upper() for name in names]"));
 }
 
+/// Verify that `--hide-comments` removes plain comments without deleting documentation text.
+#[test]
+fn hide_comments_preserves_docstrings_and_documentation_comments() {
+    // Cover Python docstrings, JavaScript JSDoc, and Rust doc comments under the public CLI flag.
+    let python_output = successful_stdout(run_uberview_with_args(
+        &fixture_path("sample_project/src/python_sample.py"),
+        &["--hide-comments"],
+    ));
+    let javascript_output = successful_stdout(run_uberview_with_args(
+        &fixture_path("sample_project/src/javascript_sample.js"),
+        &["--hide-comments"],
+    ));
+    let rust_output = successful_stdout(run_uberview_with_args(
+        &fixture_path("sample_project/src/rust_sample.rs"),
+        &["--hide-comments"],
+    ));
+
+    assert!(python_output.contains("\"\"\"Python module docs.\"\"\""));
+    assert!(python_output.contains("\"\"\"Handle the top-level case.\"\"\""));
+    assert!(python_output.contains("\"\"\"Greeter docs.\"\"\""));
+    assert!(!python_output.contains("# Module context that should stay."));
+    assert!(!python_output.contains("# Normalize before branching."));
+    assert!(!python_output.contains("# Keep the final result visible."));
+
+    assert!(javascript_output.contains("/** JavaScript module docs. */"));
+    assert!(javascript_output.contains("/** Normalize before returning. */"));
+    assert!(javascript_output.contains("/** Format one name. */"));
+    assert!(!javascript_output.contains("// Exported helper context."));
+    assert!(!javascript_output.contains("// Reject empty prefixes."));
+    assert!(!javascript_output.contains("// Keep the method exit."));
+
+    assert!(rust_output.contains("//! Crate docs."));
+    assert!(rust_output.contains("/// Public name surface."));
+    assert!(rust_output.contains("/// Service behavior."));
+    assert!(!rust_output.contains("// Keep the early-exit line."));
+    assert!(!rust_output.contains("// Preserve the tail expression."));
+}
+
 /// Verify that return-like lines disappear from the default reduced output.
 #[test]
 fn default_output_omits_exit_like_lines() {

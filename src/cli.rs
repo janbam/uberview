@@ -18,6 +18,9 @@ pub struct Cli {
     /// Restore explicit top-level assignment and constant-style symbol definitions.
     #[arg(long)]
     pub show_top_level_symbols: bool,
+    /// Hide plain inline comments while keeping docstrings and documentation comments.
+    #[arg(long)]
+    pub hide_comments: bool,
     /// Skip Markdown files during analysis, including recursive directory scans.
     #[arg(long)]
     pub exclude_markdown: bool,
