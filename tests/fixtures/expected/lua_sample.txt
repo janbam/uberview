@@ -1,0 +1,15 @@
+=== tests/fixtures/sample_project/src/lua_sample.lua ===
+
+--- Lua module docs.
+-- Module context that should stay.
+[5-13] Method: M:greet
+function M:greet(name)
+
+    --- Normalize before returning.
+    [7-10] Function: normalize
+    local function normalize(value)
+        -- Leave the nested exit visible.
+
+[15-24] Function: M.build
+M.build = function(prefix)
+    -- Reject empty prefixes.

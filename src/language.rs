@@ -18,6 +18,8 @@ pub enum LanguageKind {
     Tsx,
     /// Rust source files.
     Rust,
+    /// Lua source files.
+    Lua,
 }
 
 impl LanguageKind {
@@ -30,6 +32,7 @@ impl LanguageKind {
             Self::TypeScript => tree_sitter_typescript::LANGUAGE_TYPESCRIPT.into(),
             Self::Tsx => tree_sitter_typescript::LANGUAGE_TSX.into(),
             Self::Rust => tree_sitter_rust::LANGUAGE.into(),
+            Self::Lua => tree_sitter_lua::LANGUAGE.into(),
         }
     }
 }
@@ -82,6 +85,7 @@ fn detect_by_extension(extension: Option<&OsStr>) -> Option<LanguageKind> {
         "ts" | "mts" | "cts" => Some(LanguageKind::TypeScript),
         "tsx" => Some(LanguageKind::Tsx),
         "rs" => Some(LanguageKind::Rust),
+        "lua" => Some(LanguageKind::Lua),
         _ => None,
     }
 }
@@ -112,6 +116,10 @@ fn detect_by_shebang(sniff: &str) -> Option<LanguageKind> {
         return Some(LanguageKind::JavaScript);
     }
 
+    if first_line.contains("lua") {
+        return Some(LanguageKind::Lua);
+    }
+
     None
 }
 
@@ -140,6 +148,7 @@ mod tests {
         // Keep extensionless files eligible for shebang sniffing but prune unrelated extensions early.
         assert!(maybe_supported_path(Path::new("README.md")));
         assert!(maybe_supported_path(Path::new("main.py")));
+        assert!(maybe_supported_path(Path::new("init.lua")));
         assert!(maybe_supported_path(Path::new("script")));
         assert!(!maybe_supported_path(Path::new("data.json")));
     }
@@ -151,5 +160,14 @@ mod tests {
         let language = detect_language(Path::new("tool"), Some("#!/usr/bin/env python3\n"));
 
         assert_eq!(language, Some(LanguageKind::Python));
+    }
+
+    /// Verify that extensionless Lua scripts use the same lightweight shebang path as Python and JavaScript.
+    #[test]
+    fn detect_language_uses_shebang_for_extensionless_lua_files() {
+        // Keep Lua scripts discoverable even when command entrypoints omit extensions.
+        let language = detect_language(Path::new("tool"), Some("#!/usr/bin/env lua\n"));
+
+        assert_eq!(language, Some(LanguageKind::Lua));
     }
 }

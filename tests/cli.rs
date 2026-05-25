@@ -156,6 +156,19 @@ fn rust_single_file_matches_expected_output() {
     assert_eq!(output.trim_end(), expected.trim_end());
 }
 
+/// Verify the Lua reduced-source contract on a representative single file.
+#[test]
+fn lua_single_file_matches_expected_output() {
+    // Lock the CLI contract for Lua doc comments, colon methods, nested functions, and function-valued assignments.
+    let output = successful_stdout(run_uberview(&fixture_path(
+        "sample_project/src/lua_sample.lua",
+    )));
+    let expected = std::fs::read_to_string(fixture_path("expected/lua_sample.txt"))
+        .expect("failed to read lua expectation");
+
+    assert_eq!(output.trim_end(), expected.trim_end());
+}
+
 /// Verify deterministic directory ordering, ignore rules, and syntax recovery.
 #[test]
 fn directory_scan_is_deterministic_and_skips_default_ignored_dirs() {
@@ -168,6 +181,7 @@ fn directory_scan_is_deterministic_and_skips_default_ignored_dirs() {
             "=== docs/guide.md ===",
             "=== scripts/python_tool ===",
             "=== src/javascript_sample.js ===",
+            "=== src/lua_sample.lua ===",
             "=== src/python_broken.py ===",
             "=== src/python_sample.py ===",
             "=== src/rust_sample.rs ===",
@@ -282,6 +296,25 @@ fn extensionless_python_file_works_from_other_cwd() {
     assert!(output.contains("[5-7] Function: main"));
 }
 
+/// Verify shebang detection and cwd independence for extensionless Lua scripts.
+#[test]
+fn extensionless_lua_file_works_from_other_cwd() {
+    // Run from a throwaway cwd so extensionless Lua detection must use the file content, not cwd state.
+    let temp = tempdir().expect("failed to create temporary directory");
+    let file = temp.path().join("lua_tool");
+    std::fs::write(
+        &file,
+        "#!/usr/bin/env lua\n--- Tool docs.\nlocal function main()\n  return 0\nend\n",
+    )
+    .expect("failed to write lua fixture");
+    let cwd = tempdir().expect("failed to create alternate cwd");
+    let output = successful_stdout(run_uberview_from_cwd(&file, cwd.path()));
+
+    assert!(output.contains("#!/usr/bin/env lua"));
+    assert!(output.contains("--- Tool docs."));
+    assert!(output.contains("[3-5] Function: main"));
+}
+
 /// Verify that snippet numbering is opt-in and covers every retained item when enabled.
 #[test]
 fn show_line_numbers_for_all_items_numbers_snippets_too() {
@@ -303,7 +336,7 @@ fn show_line_numbers_for_all_items_numbers_snippets_too() {
 /// Verify that `--hide-comments` removes plain comments without deleting documentation text.
 #[test]
 fn hide_comments_preserves_docstrings_and_documentation_comments() {
-    // Cover Python docstrings, JavaScript JSDoc, and Rust doc comments under the public CLI flag.
+    // Cover Python docstrings, JavaScript JSDoc, Rust doc comments, and Lua doc comments under the public CLI flag.
     let python_output = successful_stdout(run_uberview_with_args(
         &fixture_path("sample_project/src/python_sample.py"),
         &["--hide-comments"],
@@ -314,6 +347,10 @@ fn hide_comments_preserves_docstrings_and_documentation_comments() {
     ));
     let rust_output = successful_stdout(run_uberview_with_args(
         &fixture_path("sample_project/src/rust_sample.rs"),
+        &["--hide-comments"],
+    ));
+    let lua_output = successful_stdout(run_uberview_with_args(
+        &fixture_path("sample_project/src/lua_sample.lua"),
         &["--hide-comments"],
     ));
 
@@ -336,6 +373,12 @@ fn hide_comments_preserves_docstrings_and_documentation_comments() {
     assert!(rust_output.contains("/// Service behavior."));
     assert!(!rust_output.contains("// Keep the early-exit line."));
     assert!(!rust_output.contains("// Preserve the tail expression."));
+
+    assert!(lua_output.contains("--- Lua module docs."));
+    assert!(lua_output.contains("--- Normalize before returning."));
+    assert!(!lua_output.contains("-- Module context that should stay."));
+    assert!(!lua_output.contains("-- Leave the nested exit visible."));
+    assert!(!lua_output.contains("-- Reject empty prefixes."));
 }
 
 /// Verify that return-like lines disappear from the default reduced output.
@@ -351,6 +394,9 @@ fn default_output_omits_exit_like_lines() {
     let rust_output = successful_stdout(run_uberview(&fixture_path(
         "sample_project/src/rust_sample.rs",
     )));
+    let lua_output = successful_stdout(run_uberview(&fixture_path(
+        "sample_project/src/lua_sample.lua",
+    )));
 
     assert!(!python_output.contains("return value + 1"));
     assert!(!python_output.contains("raise ValueError"));
@@ -360,6 +406,9 @@ fn default_output_omits_exit_like_lines() {
     assert!(!rust_output.contains("parse::<usize>()?"));
     assert!(!rust_output.contains("return Err(\"zero\".to_owned())"));
     assert!(!rust_output.contains("Ok(self.name.clone())"));
+    assert!(!lua_output.contains("return value:gsub"));
+    assert!(!lua_output.contains("return normalize(name)"));
+    assert!(!lua_output.contains("return M"));
 }
 
 /// Verify that `--show-returns` restores only actual return statements.
@@ -378,6 +427,10 @@ fn show_returns_restores_actual_returns_only() {
         &fixture_path("sample_project/src/rust_sample.rs"),
         &["--show-returns"],
     ));
+    let lua_output = successful_stdout(run_uberview_with_args(
+        &fixture_path("sample_project/src/lua_sample.lua"),
+        &["--show-returns"],
+    ));
 
     assert!(python_output.contains("return value + 1"));
     assert!(python_output.contains("return nested(value)"));
@@ -394,6 +447,11 @@ fn show_returns_restores_actual_returns_only() {
     assert!(rust_output.contains("return Err(\"zero\".to_owned())"));
     assert!(!rust_output.contains("parse::<usize>()?"));
     assert!(!rust_output.contains("Ok(self.name.clone())"));
+
+    assert!(lua_output.contains("return value:gsub"));
+    assert!(lua_output.contains("return normalize(name)"));
+    assert!(lua_output.contains("return nil"));
+    assert!(lua_output.contains("return M"));
 }
 
 /// Verify that mixed file and directory inputs preserve root order while deduplicating overlaps.
@@ -418,6 +476,7 @@ fn mixed_file_and_directory_inputs_keep_order_without_duplicates() {
             "=== docs/guide.md ===",
             "=== scripts/python_tool ===",
             "=== src/javascript_sample.js ===",
+            "=== src/lua_sample.lua ===",
             "=== src/python_broken.py ===",
             "=== src/rust_sample.rs ===",
             "=== src/typescript_sample.ts ===",
@@ -453,6 +512,7 @@ fn normalized_file_input_deduplicates_against_later_directory_root() {
             "=== docs/guide.md ===",
             "=== scripts/python_tool ===",
             "=== src/javascript_sample.js ===",
+            "=== src/lua_sample.lua ===",
             "=== src/python_broken.py ===",
             "=== src/rust_sample.rs ===",
             "=== src/typescript_sample.ts ===",
@@ -485,6 +545,7 @@ fn overlapping_directory_roots_keep_stable_unique_order() {
         &output,
         &[
             "=== javascript_sample.js ===",
+            "=== lua_sample.lua ===",
             "=== python_broken.py ===",
             "=== python_sample.py ===",
             "=== rust_sample.rs ===",

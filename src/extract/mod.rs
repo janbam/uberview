@@ -1,4 +1,5 @@
 mod javascript;
+mod lua;
 mod markdown;
 mod python;
 mod rust;
@@ -371,6 +372,7 @@ fn capture_definition<'tree>(
             javascript::capture_definition(language, node, source)
         }
         LanguageKind::Rust => rust::capture_definition(node, source),
+        LanguageKind::Lua => lua::capture_definition(node, source),
     }
 }
 
@@ -388,6 +390,7 @@ fn capture_snippet(
             javascript::capture_snippet(node, options)
         }
         LanguageKind::Rust => rust::capture_snippet(node, options),
+        LanguageKind::Lua => lua::capture_snippet(node, options),
     }?;
 
     // Let docstrings/doc-comments keep documenting structure while plain comments can disappear.
@@ -410,6 +413,7 @@ fn is_comment_node(language: LanguageKind, node: Node<'_>) -> bool {
             javascript::is_comment_node(node)
         }
         LanguageKind::Rust => rust::is_comment_node(node),
+        LanguageKind::Lua => lua::is_comment_node(node),
     }
 }
 
@@ -429,6 +433,7 @@ fn is_doc_comment(language: LanguageKind, source: &SourceText, span: TextSpan) -
                 || text.starts_with("/*!")
         }
         LanguageKind::Python | LanguageKind::Markdown => false,
+        LanguageKind::Lua => text.starts_with("---"),
     }
 }
 
@@ -441,6 +446,7 @@ fn should_skip_node(language: LanguageKind, node: Node<'_>) -> bool {
             javascript::should_skip_node(node)
         }
         LanguageKind::Rust => rust::should_skip_node(node),
+        LanguageKind::Lua => lua::should_skip_node(node),
     }
 }
 
@@ -470,7 +476,10 @@ fn is_attachable_comment_snippet(source: &SourceText, snippet: Snippet) -> bool 
     let text = source.span_text(source.trim_trailing_line_breaks(snippet.span));
     let trimmed = text.trim_start();
 
-    trimmed.starts_with('#') || trimmed.starts_with("//") || trimmed.starts_with("/*")
+    trimmed.starts_with('#')
+        || trimmed.starts_with("--")
+        || trimmed.starts_with("//")
+        || trimmed.starts_with("/*")
 }
 
 /// Decide whether a comment snippet sits flush against a skipped symbol definition on one side.

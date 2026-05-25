@@ -20,6 +20,7 @@ The output reads like reduced source, not metadata.
 - JavaScript
 - TypeScript and TSX
 - Rust
+- Lua
 
 Uberview auto-detects languages by extension first, then filename patterns, then lightweight shebang sniffing when needed.
 
