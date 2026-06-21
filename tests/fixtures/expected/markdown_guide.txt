@@ -1,13 +1,9 @@
 === tests/fixtures/sample_project/docs/guide.md ===
 
-[1-13] Heading: Uberview Markdown
+[1-13] Uberview Markdown
     _Map the documentation structure without keeping the whole prose body._
-
-    [5-13] Heading: Install And Run
+    [5-13] Install And Run
         _Keep setup commands easy to find._
-
-        [10-13] Heading: Flags
-
-[14-20] Heading: Output Contract
-
-    [18-20] Heading: Edge Cases
+        [10-13] Flags
+[14-20] Output Contract
+    [18-20] Edge Cases

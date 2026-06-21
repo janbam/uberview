@@ -1,5 +1,6 @@
 use crate::model::{
-    Definition, FileOutput, FileSection, Item, LineRange, SkippedRange, Snippet, TextSpan,
+    Definition, DefinitionKind, FileOutput, FileSection, Item, LineRange, SkippedRange, Snippet,
+    TextSpan,
 };
 
 /// The fixed indent unit used to visualize retained container nesting.
@@ -118,13 +119,7 @@ fn render_definition(
     }
 
     // Add the synthetic summary line before the retained source so large files scan faster.
-    lines.push(format!(
-        "{}[{}] {}: {}",
-        render_indent(depth),
-        format_line_range(definition.line_range),
-        definition.kind.label(),
-        definition.name
-    ));
+    lines.push(format_definition_summary_line(definition, depth));
 
     // Let callers suppress raw header echoing when the synthetic line already says everything useful.
     if definition.render_header_source {
@@ -148,8 +143,37 @@ fn render_definition(
         render_item(item, section, options, depth + 1, lines);
     }
 
-    // Separate whole definition blocks so adjacent structure does not visually collapse together.
-    push_blank_line_if_needed(lines);
+    // Separate code-like blocks, while keeping Markdown heading outlines compact.
+    if should_follow_definition_with_blank_line(definition) {
+        push_blank_line_if_needed(lines);
+    }
+}
+
+/// Render the synthetic definition line shown before any retained source text.
+fn format_definition_summary_line(definition: &Definition, depth: usize) -> String {
+    let prefix = format!(
+        "{}[{}]",
+        render_indent(depth),
+        format_line_range(definition.line_range)
+    );
+
+    // Markdown headings already read as outline entries, so the kind label adds noise.
+    if definition.kind == DefinitionKind::Heading {
+        return format!("{} {}", prefix, definition.name);
+    }
+
+    format!(
+        "{} {}: {}",
+        prefix,
+        definition.kind.label(),
+        definition.name
+    )
+}
+
+/// Decide whether a completed definition block should leave a visual separator behind it.
+fn should_follow_definition_with_blank_line(definition: &Definition) -> bool {
+    // Markdown headings form an outline; blank lines between plain heading rows make it harder to scan.
+    definition.kind != DefinitionKind::Heading
 }
 
 /// Render a synthetic placeholder for one omitted top-level symbol run.
@@ -279,6 +303,7 @@ fn should_precede_nested_container_with_blank_line(
 ) -> bool {
     // Separate only multiline nested definitions so compact member lists do not become overly sparse.
     depth > 0
+        && definition.kind != DefinitionKind::Heading
         && definition.line_range.start != definition.line_range.end
         && lines.last().is_some_and(|line| !line.is_empty())
 }
