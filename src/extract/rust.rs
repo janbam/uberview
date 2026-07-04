@@ -25,6 +25,7 @@ pub fn capture_definition<'tree>(
         | "field_declaration" | "enum_variant" => Some(DefinitionCapture {
             kind: definition_kind(node),
             name: definition_name(node, source)?,
+            exported: is_public_definition(node, source),
             span: prefixed_span(node),
             header_span: prefixed_span(node),
             body: None,
@@ -68,6 +69,7 @@ fn capture_container_or_leaf<'tree>(
         return Some(DefinitionCapture {
             kind,
             name,
+            exported: is_public_definition(node, source),
             span: explicit_span(span.start_byte, node.end_byte()),
             header_span: explicit_span(span.start_byte, body_header_end(source, body)),
             body: Some(body),
@@ -77,10 +79,19 @@ fn capture_container_or_leaf<'tree>(
     Some(DefinitionCapture {
         kind,
         name,
+        exported: is_public_definition(node, source),
         span,
         header_span: span,
         body: None,
     })
+}
+
+/// Decide whether a Rust item carries an explicit public visibility marker.
+fn is_public_definition(node: Node<'_>, source: &SourceText) -> bool {
+    let text = source.span_text(node_span(node)).trim_start();
+
+    // Keep Rust visibility simple and source-derived: `pub` and `pub(...)` are public surface.
+    text.starts_with("pub ") || text.starts_with("pub(")
 }
 
 /// Expand a Rust item's span upward to include immediately attached attributes.

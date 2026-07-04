@@ -35,6 +35,19 @@ impl LanguageKind {
             Self::Lua => tree_sitter_lua::LANGUAGE.into(),
         }
     }
+
+    /// Return the compact machine-facing language code used by JSON output.
+    pub const fn json_code(self) -> &'static str {
+        match self {
+            Self::Markdown => "md",
+            Self::Python => "py",
+            Self::JavaScript => "js",
+            Self::TypeScript => "ts",
+            Self::Tsx => "tsx",
+            Self::Rust => "rs",
+            Self::Lua => "lua",
+        }
+    }
 }
 
 /// Configure a parser for the selected language.

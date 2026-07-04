@@ -1,0 +1,67 @@
+{
+  "schema": "uberview/1",
+  "root": "__ROOT__",
+  "files": [
+    {
+      "path": "sample.ts",
+      "language": "ts",
+      "lines": 16,
+      "symbols": [
+        {
+          "kind": "class",
+          "name": "Greeter",
+          "range": [
+            2,
+            7
+          ],
+          "exported": true,
+          "signature": "export class Greeter {",
+          "doc": "Public greeter.",
+          "inlineComments": [],
+          "children": [
+            {
+              "kind": "method",
+              "name": "ask",
+              "range": [
+                3,
+                6
+              ],
+              "exported": true,
+              "signature": "ask(name: string): string {",
+              "inlineComments": [
+                "Validate the request."
+              ],
+              "children": []
+            }
+          ]
+        },
+        {
+          "kind": "function",
+          "name": "localOnly",
+          "range": [
+            9,
+            11
+          ],
+          "exported": false,
+          "signature": "function localOnly(): void {",
+          "inlineComments": [
+            "Hidden implementation detail."
+          ],
+          "children": []
+        },
+        {
+          "kind": "function",
+          "name": "exportedLater",
+          "range": [
+            13,
+            14
+          ],
+          "exported": true,
+          "signature": "function exportedLater(): void {",
+          "inlineComments": [],
+          "children": []
+        }
+      ]
+    }
+  ]
+}

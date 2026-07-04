@@ -77,6 +77,7 @@ fn capture_container_or_leaf<'tree>(
         return Some(DefinitionCapture {
             kind,
             name,
+            exported: false,
             span: node_span(node),
             header_span: explicit_span(node.start_byte(), body_header_end(source, body)),
             body: Some(body),
@@ -86,6 +87,7 @@ fn capture_container_or_leaf<'tree>(
     Some(DefinitionCapture {
         kind,
         name,
+        exported: false,
         span: node_span(node),
         header_span: node_span(node),
         body: None,
@@ -116,6 +118,7 @@ fn capture_variable_definition<'tree>(
             return Some(DefinitionCapture {
                 kind,
                 name,
+                exported: false,
                 span: node_span(node),
                 header_span: node_span(node),
                 body: None,
@@ -125,6 +128,7 @@ fn capture_variable_definition<'tree>(
         return Some(DefinitionCapture {
             kind,
             name,
+            exported: false,
             span: node_span(node),
             header_span: explicit_span(node.start_byte(), body_header_end(source, body)),
             body: Some(body),
@@ -142,6 +146,7 @@ fn capture_variable_definition<'tree>(
         return Some(DefinitionCapture {
             kind: callable_or_class_kind(value),
             name,
+            exported: false,
             span: node_span(node),
             header_span: node_span(node),
             body: None,
@@ -152,6 +157,7 @@ fn capture_variable_definition<'tree>(
         return Some(DefinitionCapture {
             kind: variable_definition_kind(node, source),
             name,
+            exported: false,
             span: node_span(node),
             header_span: node_span(node),
             body: None,
@@ -173,6 +179,7 @@ fn capture_export_definition<'tree>(
                 capture_variable_definition(declaration, source).map(|capture| DefinitionCapture {
                     kind: capture.kind,
                     name: capture.name,
+                    exported: true,
                     span: node_span(node),
                     header_span: explicit_span(node.start_byte(), capture.header_span.end_byte),
                     body: capture.body,
@@ -181,6 +188,7 @@ fn capture_export_definition<'tree>(
             _ => capture_container_or_leaf(declaration, source).map(|capture| DefinitionCapture {
                 kind: capture.kind,
                 name: capture.name,
+                exported: true,
                 span: node_span(node),
                 header_span: explicit_span(node.start_byte(), capture.header_span.end_byte),
                 body: capture.body,
@@ -194,6 +202,7 @@ fn capture_export_definition<'tree>(
         return Some(DefinitionCapture {
             kind: export_value_kind(value),
             name: export_value_name(value, source),
+            exported: true,
             span: node_span(node),
             header_span: node_span(node),
             body: None,
@@ -222,6 +231,7 @@ fn capture_object_pair_definition<'tree>(
         return Some(DefinitionCapture {
             kind: DefinitionKind::Function,
             name,
+            exported: false,
             span: node_span(node),
             header_span: explicit_span(node.start_byte(), body_header_end(source, body)),
             body: Some(body),

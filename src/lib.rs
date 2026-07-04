@@ -6,6 +6,8 @@ pub mod cli;
 pub mod extract;
 /// Filesystem traversal and input resolution helpers.
 pub mod fs;
+/// JSON rendering for deterministic machine-readable output.
+pub mod json;
 /// Source-language detection and parser configuration.
 pub mod language;
 /// The thin internal model that drives rendering.

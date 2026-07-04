@@ -53,6 +53,7 @@ fn capture_function_declaration<'tree>(
     Some(DefinitionCapture {
         kind: function_name_kind(name_node),
         name: trimmed_node_text(source, name_node),
+        exported: false,
         span: node_span(node),
         header_span: explicit_span(node.start_byte(), function_header_end(node)),
         body: Some(node),
@@ -75,6 +76,7 @@ fn capture_assignment_like_definition<'tree>(
         return Some(DefinitionCapture {
             kind: assignment_kind(node),
             name,
+            exported: false,
             span: node_span(node),
             header_span: node_span(node),
             body: None,
@@ -112,6 +114,7 @@ fn capture_function_value<'tree>(
     DefinitionCapture {
         kind: DefinitionKind::Function,
         name,
+        exported: false,
         span: node_span(owner),
         header_span: explicit_span(owner.start_byte(), function_header_end(function)),
         body: Some(function),

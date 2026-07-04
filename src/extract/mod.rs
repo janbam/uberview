@@ -4,6 +4,7 @@ mod markdown;
 mod python;
 mod rust;
 use anyhow::{Result, bail};
+use std::collections::HashSet;
 use tree_sitter::{Node, Parser, Point};
 
 use crate::language::{self, LanguageKind};
@@ -42,6 +43,12 @@ pub fn extract_file(
     let tree = language::parse_source(&mut parser, source.as_str())?;
     let root = tree.root_node();
     ensure_tree_has_no_syntax_errors(root, &display_path)?;
+    let python_exports = if language == LanguageKind::Python {
+        python_all_exports(root, &source)
+    } else {
+        None
+    };
+    let named_exports = is_javascript_family(language).then(|| named_export_list(root, &source));
     let items = collect_items(root, language, &source, options);
     let items = if options.show_top_level_symbols {
         items
@@ -49,9 +56,16 @@ pub fn extract_file(
         collapse_top_level_symbols(items, &source)
     };
     let items = attach_leading_comment_snippets(items, &source);
+    let items = mark_public_surface(
+        language,
+        items,
+        python_exports.as_ref(),
+        named_exports.as_ref(),
+    );
 
     Ok(FileSection {
         display_path,
+        language,
         source,
         items,
     })
@@ -81,6 +95,8 @@ struct DefinitionCapture<'tree> {
     kind: DefinitionKind,
     /// The user-facing name attached to the definition.
     name: String,
+    /// Whether the syntax itself marks this definition as exported.
+    exported: bool,
     /// The full source extent of the definition.
     span: TextSpan,
     /// The retained header slice emitted with the line-range prefix.
@@ -160,6 +176,7 @@ fn build_definition(
         // Keep the header metadata fully source-derived so later rendering stays deterministic.
         kind: capture.kind,
         name: capture.name,
+        exported: capture.exported,
         leading_comment_snippets: Vec::new(),
         span: capture.span,
         header_span: source.trim_trailing_line_breaks(capture.header_span),
@@ -167,6 +184,169 @@ fn build_definition(
         line_range: LineRange { start, end },
         items,
     }
+}
+
+/// Apply public-surface rules that require looking beyond one syntax node.
+fn mark_public_surface(
+    language: LanguageKind,
+    mut items: Vec<Item>,
+    python_exports: Option<&HashSet<String>>,
+    named_exports: Option<&HashSet<String>>,
+) -> Vec<Item> {
+    for item in &mut items {
+        mark_public_item(item, language, python_exports, named_exports, true);
+    }
+
+    items
+}
+
+/// Mark one retained definition and recurse through children with language-local visibility rules.
+fn mark_public_item(
+    item: &mut Item,
+    language: LanguageKind,
+    python_exports: Option<&HashSet<String>>,
+    named_exports: Option<&HashSet<String>>,
+    is_top_level: bool,
+) {
+    let Item::Definition(definition) = item else {
+        return;
+    };
+
+    // Python top-level symbols obey `__all__` when present; otherwise a leading underscore hides them.
+    if language == LanguageKind::Python {
+        definition.exported = match (is_top_level, python_exports) {
+            (true, Some(names)) => names.contains(&definition.name),
+            (true, None) => !definition.name.starts_with('_'),
+            (false, _) => !definition.name.starts_with('_'),
+        };
+    }
+
+    // Named JS/TS export lists mark earlier top-level declarations as part of the public surface.
+    if is_top_level && named_exports.is_some_and(|names| names.contains(&definition.name)) {
+        definition.exported = true;
+    }
+
+    for child in &mut definition.items {
+        mark_public_item(child, language, python_exports, named_exports, false);
+    }
+}
+
+/// Extract a static Python `__all__` string list from a top-level assignment node.
+fn python_all_exports(root: Node<'_>, source: &SourceText) -> Option<HashSet<String>> {
+    let mut cursor = root.walk();
+
+    for child in root.children(&mut cursor).filter(|child| child.is_named()) {
+        let text = source.span_text(node_span(child)).trim_start();
+        let Some(rest) = text.strip_prefix("__all__") else {
+            continue;
+        };
+        if !rest.trim_start().starts_with('=') {
+            continue;
+        }
+        let Some(after_equals) = rest.split_once('=').map(|(_, value)| value) else {
+            continue;
+        };
+
+        return parse_python_all_literal(after_equals);
+    }
+
+    None
+}
+
+/// Parse simple quoted names from a literal `__all__ = [...]` assignment.
+fn parse_python_all_literal(text: &str) -> Option<HashSet<String>> {
+    let trimmed = text.trim_start();
+    if !trimmed.starts_with('[') && !trimmed.starts_with('(') {
+        return None;
+    }
+
+    let mut names = HashSet::new();
+    let mut chars = text.chars().peekable();
+
+    while let Some(ch) = chars.next() {
+        if ch != '\'' && ch != '"' {
+            continue;
+        }
+
+        let quote = ch;
+        let mut value = String::new();
+        let mut escaped = false;
+
+        // Keep this deliberately literal-only; dynamic `__all__` falls back to the names we can prove.
+        for next in chars.by_ref() {
+            if escaped {
+                value.push(next);
+                escaped = false;
+                continue;
+            }
+
+            if next == '\\' {
+                escaped = true;
+                continue;
+            }
+
+            if next == quote {
+                names.insert(value);
+                break;
+            }
+
+            value.push(next);
+        }
+    }
+
+    Some(names)
+}
+
+/// Collect local names mentioned in static `export { name }` lists.
+fn named_export_list(root: Node<'_>, source: &SourceText) -> HashSet<String> {
+    let mut exports = HashSet::new();
+    let mut cursor = root.walk();
+
+    // Inspect only top-level export statements so nested text cannot forge public surface.
+    for child in root.children(&mut cursor).filter(|child| child.is_named()) {
+        if child.kind() != "export_statement" {
+            continue;
+        }
+
+        collect_named_exports_from_statement(source.span_text(node_span(child)), &mut exports);
+    }
+
+    exports
+}
+
+/// Extract local names from one braced export list, ignoring re-export-from statements.
+fn collect_named_exports_from_statement(statement: &str, exports: &mut HashSet<String>) {
+    let trimmed = statement.trim_start();
+    if !trimmed.starts_with("export") || trimmed.contains(" from ") {
+        return;
+    }
+
+    let Some(start) = trimmed.find('{') else {
+        return;
+    };
+    let Some(end) = trimmed[start + 1..]
+        .find('}')
+        .map(|offset| start + 1 + offset)
+    else {
+        return;
+    };
+
+    // `export { local as public }` exports the local symbol; the alias is not a local declaration name.
+    for part in trimmed[start + 1..end].split(',') {
+        let name = part.split_whitespace().next().unwrap_or_default().trim();
+
+        if !name.is_empty() {
+            exports.insert(name.to_owned());
+        }
+    }
+}
+
+/// Report whether a language uses JavaScript-family export-list syntax.
+fn is_javascript_family(language: LanguageKind) -> bool {
+    matches!(
+        language,
+        LanguageKind::JavaScript | LanguageKind::TypeScript | LanguageKind::Tsx
+    )
 }
 
 /// Drop exact duplicate spans that can arise from recursive traversal through recovery nodes.
