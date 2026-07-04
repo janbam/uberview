@@ -2,6 +2,7 @@ use anyhow::Result;
 use rayon::prelude::*;
 use std::collections::HashSet;
 use std::fs as std_fs;
+use std::path::PathBuf;
 
 use crate::cli::Cli;
 use crate::extract::{self, ExtractOptions};
@@ -9,6 +10,7 @@ use crate::fs::{
     DiscoveredFile, InputTarget, ResolvedInput, discover_directory_files, resolve_input,
     resolve_inputs_lenient,
 };
+use crate::json::{self as json_render, JsonRenderFile};
 use crate::model::{FileFailure, FileOutput, FileSection};
 use crate::render::{self, RenderOptions};
 
@@ -21,8 +23,26 @@ enum OutputWorkItem {
     Pending(DiscoveredFile),
 }
 
+/// One parsed file paired with the path metadata needed by JSON rendering.
+#[derive(Debug)]
+struct JsonOutputItem {
+    /// The canonical source path used for root-relative JSON paths.
+    actual_path: PathBuf,
+    /// The extracted file output, or a parse/read failure to report on stderr.
+    output: FileOutput,
+}
+
 /// Run TreeBrief for the parsed CLI input.
 pub fn run(cli: Cli) -> Result<()> {
+    if cli.show_json_schema {
+        println!("{}", json_render::render_schema());
+        return Ok(());
+    }
+
+    if cli.json {
+        return run_json(cli);
+    }
+
     // Carry the CLI toggles once so both single-file and directory modes render consistently.
     let render_options = RenderOptions {
         show_line_numbers_for_all_items: cli.show_line_numbers_for_all_items,
@@ -67,6 +87,87 @@ pub fn run(cli: Cli) -> Result<()> {
         .collect::<Vec<_>>();
 
     println!("{}", render::render_outputs(&outputs, render_options));
+
+    Ok(())
+}
+
+/// Run Uberview in deterministic JSON mode, keeping diagnostics off stdout.
+fn run_json(cli: Cli) -> Result<()> {
+    let extract_options = ExtractOptions {
+        show_returns: cli.show_returns,
+        show_top_level_symbols: cli.show_top_level_symbols,
+        hide_comments: cli.hide_comments,
+    };
+
+    // Preserve the existing strict behavior for a true explicit single-file parse failure.
+    if let [path] = cli.paths.as_slice() {
+        if let InputTarget::File(file) = resolve_input(path)? {
+            let root = file
+                .actual_path
+                .parent()
+                .map(PathBuf::from)
+                .unwrap_or_else(|| file.actual_path.clone());
+
+            if should_exclude_file(&file, &cli) {
+                println!("{}", json_render::render_document(&root, &[]));
+                return Ok(());
+            }
+
+            let section = parse_file_strict(&file, extract_options)?;
+            println!(
+                "{}",
+                json_render::render_document(
+                    &root,
+                    &[JsonRenderFile {
+                        actual_path: &file.actual_path,
+                        section: &section,
+                    }],
+                )
+            );
+            return Ok(());
+        }
+    }
+
+    let inputs = resolve_inputs_lenient(&cli.paths);
+    let root = json_root_for_inputs(&inputs)?;
+    let work_items = collect_output_work(inputs, &cli);
+
+    if work_items.is_empty() {
+        println!("{}", json_render::render_document(&root, &[]));
+        return Ok(());
+    }
+
+    // Parse files in parallel, but materialize diagnostics before rendering the single stdout document.
+    let outputs = work_items
+        .into_par_iter()
+        .filter_map(|item| match item {
+            OutputWorkItem::Ready(FileOutput::Failure(failure)) => Some(JsonOutputItem {
+                actual_path: root.join(&failure.display_path),
+                output: FileOutput::Failure(failure),
+            }),
+            OutputWorkItem::Ready(FileOutput::Section(_)) => None,
+            OutputWorkItem::Pending(file) => Some(parse_file_json_lenient(&file, extract_options)),
+        })
+        .collect::<Vec<_>>();
+
+    for item in &outputs {
+        if let FileOutput::Failure(failure) = &item.output {
+            eprintln!("{}: {}", failure.display_path, failure.message);
+        }
+    }
+
+    let files = outputs
+        .iter()
+        .filter_map(|item| match &item.output {
+            FileOutput::Section(section) => Some(JsonRenderFile {
+                actual_path: &item.actual_path,
+                section,
+            }),
+            FileOutput::Failure(_) => None,
+        })
+        .collect::<Vec<_>>();
+
+    println!("{}", json_render::render_document(&root, &files));
 
     Ok(())
 }
@@ -164,4 +265,48 @@ fn parse_file_lenient(file: &DiscoveredFile, extract_options: ExtractOptions) ->
             message: error.to_string(),
         }),
     }
+}
+
+/// Parse one file for JSON mode while preserving its canonical path for later serialization.
+fn parse_file_json_lenient(
+    file: &DiscoveredFile,
+    extract_options: ExtractOptions,
+) -> JsonOutputItem {
+    JsonOutputItem {
+        actual_path: file.actual_path.clone(),
+        output: parse_file_lenient(file, extract_options),
+    }
+}
+
+/// Choose the single absolute root used for JSON-relative file paths.
+fn json_root_for_inputs(inputs: &[ResolvedInput]) -> Result<PathBuf> {
+    let roots = inputs
+        .iter()
+        .filter_map(|input| match input {
+            ResolvedInput::Target(InputTarget::File(file)) => {
+                file.actual_path.parent().map(PathBuf::from)
+            }
+            ResolvedInput::Target(InputTarget::Directory { actual_path, .. }) => {
+                Some(actual_path.clone())
+            }
+            ResolvedInput::Failure(_) => None,
+        })
+        .collect::<Vec<_>>();
+
+    // Fall back to cwd when every input failed before a filesystem root could be resolved.
+    Ok(common_ancestor(&roots).unwrap_or(std::env::current_dir()?))
+}
+
+/// Return the deepest path prefix shared by every candidate root.
+fn common_ancestor(paths: &[PathBuf]) -> Option<PathBuf> {
+    let mut ancestor = paths.first()?.clone();
+
+    // Walk upward until every root lives under the candidate ancestor.
+    while !paths.iter().all(|path| path.starts_with(&ancestor)) {
+        if !ancestor.pop() {
+            return None;
+        }
+    }
+
+    Some(ancestor)
 }

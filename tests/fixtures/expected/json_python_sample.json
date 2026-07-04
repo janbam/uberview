@@ -1,0 +1,51 @@
+{
+  "schema": "uberview/1",
+  "root": "__ROOT__",
+  "files": [
+    {
+      "path": "sample.py",
+      "language": "py",
+      "lines": 11,
+      "symbols": [
+        {
+          "kind": "class",
+          "name": "PublicThing",
+          "range": [
+            3,
+            8
+          ],
+          "exported": true,
+          "signature": "class PublicThing:",
+          "doc": "Public docs.",
+          "inlineComments": [],
+          "children": [
+            {
+              "kind": "method",
+              "name": "run",
+              "range": [
+                6,
+                8
+              ],
+              "exported": true,
+              "signature": "def run(self):\n    # Keep the method body visible.",
+              "inlineComments": [],
+              "children": []
+            }
+          ]
+        },
+        {
+          "kind": "function",
+          "name": "_hidden",
+          "range": [
+            10,
+            11
+          ],
+          "exported": false,
+          "signature": "def _hidden():",
+          "inlineComments": [],
+          "children": []
+        }
+      ]
+    }
+  ]
+}

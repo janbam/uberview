@@ -21,6 +21,7 @@ pub fn capture_definition<'tree>(
             Some(DefinitionCapture {
                 kind: definition_kind(node),
                 name: definition_name(node, source)?,
+                exported: false,
                 span: node_span(node),
                 header_span: explicit_span(node.start_byte(), header_end),
                 body,
@@ -34,6 +35,7 @@ pub fn capture_definition<'tree>(
             Some(DefinitionCapture {
                 kind: definition_kind(definition),
                 name: definition_name(definition, source)?,
+                exported: false,
                 span: explicit_span(node.start_byte(), definition.end_byte()),
                 header_span: explicit_span(node.start_byte(), header_end),
                 body,
@@ -44,6 +46,7 @@ pub fn capture_definition<'tree>(
                 Some(DefinitionCapture {
                     kind: assignment_kind(node),
                     name: assignment_name(node, source)?,
+                    exported: false,
                     span: node_span(node),
                     header_span: node_span(node),
                     body: None,

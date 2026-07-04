@@ -9,6 +9,12 @@ use std::path::PathBuf;
     about = "Print a compact, source-ordered structural overview of a source file or codebase."
 )]
 pub struct Cli {
+    /// Print one machine-readable JSON document instead of the human text view.
+    #[arg(long)]
+    pub json: bool,
+    /// Print the JSON output schema and exit without scanning inputs.
+    #[arg(long)]
+    pub show_json_schema: bool,
     /// Extend line-number prefixes from definitions to every retained item.
     #[arg(long)]
     pub show_line_numbers_for_all_items: bool,
@@ -26,6 +32,6 @@ pub struct Cli {
     pub exclude_markdown: bool,
     /// One or more files or directories to analyze.
     /// Directory inputs render file headers relative to each provided root.
-    #[arg(required = true)]
+    #[arg(required_unless_present = "show_json_schema")]
     pub paths: Vec<PathBuf>,
 }

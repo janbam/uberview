@@ -21,6 +21,7 @@ pub fn extract_file(display_path: String, source: String) -> Result<FileSection>
 
     Ok(FileSection {
         display_path,
+        language: crate::language::LanguageKind::Markdown,
         source,
         items,
     })
@@ -110,6 +111,7 @@ fn build_heading_items(
             // Keep Markdown aligned with the existing reduced-source model instead of inventing a second renderer.
             kind: DefinitionKind::Heading,
             name: heading.name.clone(),
+            exported: false,
             leading_comment_snippets: Vec::new(),
             span: heading.section_span,
             header_span: source.trim_trailing_line_breaks(heading.header_span),

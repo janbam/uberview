@@ -27,6 +27,16 @@ impl SourceText {
         &self.text
     }
 
+    /// Return the number of physical source lines represented by this text.
+    pub fn line_count(&self) -> usize {
+        // Mirror common editor semantics: an empty file has zero lines; otherwise line breaks delimit lines.
+        if self.text.is_empty() {
+            0
+        } else {
+            self.text.lines().count()
+        }
+    }
+
     /// Borrow the exact source text covered by a span.
     pub fn span_text(&self, span: TextSpan) -> &str {
         &self.text[span.start_byte..span.end_byte]

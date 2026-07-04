@@ -2,6 +2,7 @@ use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
 use std::thread;
 
+use serde_json::Value;
 use tempfile::tempdir;
 
 /// Return the repository-local path used for fixtures and expected outputs.
@@ -24,6 +25,14 @@ fn fixture_display_path(relative: &str) -> String {
 /// Return the compiled binary path exposed by Cargo integration tests.
 fn binary_path() -> &'static str {
     env!("CARGO_BIN_EXE_uberview")
+}
+
+/// Run Uberview with flags that do not require a path argument.
+fn run_uberview_args_only(args: &[&str]) -> Output {
+    Command::new(binary_path())
+        .args(args)
+        .output()
+        .expect("failed to run uberview")
 }
 
 /// Run Uberview for one input path and capture the full process output.
@@ -90,6 +99,53 @@ fn assert_in_order(haystack: &str, needles: &[&str]) {
     }
 }
 
+/// Return the JSON contract fixture root as the CLI will canonicalize it.
+fn json_contract_root() -> String {
+    fixture_path("json_contract")
+        .canonicalize()
+        .expect("json fixture root should canonicalize")
+        .to_string_lossy()
+        .replace('\\', "/")
+}
+
+/// Read one expected JSON fixture and substitute the absolute test root.
+fn expected_json(relative: &str) -> String {
+    // Keep the golden byte-exact after root substitution without hardcoding jan's checkout path.
+    std::fs::read_to_string(fixture_path(relative))
+        .expect("failed to read JSON expectation")
+        .replace("__ROOT__", &json_contract_root())
+}
+
+/// Assert every inlineComments array contains only strings, never position-bearing objects.
+fn assert_inline_comments_have_no_anchor_fields(value: &Value) {
+    // Walk the full JSON tree so future nested-symbol changes cannot sneak anchors in below the first level.
+    match value {
+        Value::Object(object) => {
+            if let Some(comments) = object.get("inlineComments") {
+                let comments = comments
+                    .as_array()
+                    .expect("inlineComments should be an array");
+                for comment in comments {
+                    assert!(
+                        comment.is_string(),
+                        "inlineComments entries must stay anchorless strings: {comment:?}"
+                    );
+                }
+            }
+
+            for child in object.values() {
+                assert_inline_comments_have_no_anchor_fields(child);
+            }
+        }
+        Value::Array(values) => {
+            for child in values {
+                assert_inline_comments_have_no_anchor_fields(child);
+            }
+        }
+        _ => {}
+    }
+}
+
 /// Verify the Python reduced-source contract on a representative single file.
 #[test]
 fn python_single_file_matches_expected_output() {
@@ -141,6 +197,147 @@ fn typescript_single_file_matches_expected_output() {
         .expect("failed to read typescript expectation");
 
     assert_eq!(output.trim_end(), expected.trim_end());
+}
+
+/// Verify that the new JSON feature does not perturb the default human text contract.
+#[test]
+fn human_output_is_unchanged_when_json_flag_is_absent() {
+    // Re-run the TypeScript golden through the normal CLI path so JSON plumbing cannot silently affect text output.
+    let output = successful_stdout(run_uberview(&fixture_path(
+        "sample_project/src/typescript_sample.ts",
+    )));
+    let expected = std::fs::read_to_string(fixture_path("expected/typescript_sample.txt"))
+        .expect("failed to read typescript expectation");
+
+    assert_eq!(output.trim_end(), expected.trim_end());
+}
+
+/// Verify the machine-readable TypeScript JSON contract on a compact fixture.
+#[test]
+fn json_typescript_single_file_matches_expected_output() {
+    // Lock exported class/member semantics, stripped docs, inline comments, and anchorless comment shape.
+    let output = successful_stdout(run_uberview_with_args(
+        &fixture_path("json_contract/sample.ts"),
+        &["--json"],
+    ));
+
+    assert_eq!(
+        output,
+        expected_json("expected/json_typescript_sample.json")
+    );
+}
+
+/// Verify the machine-readable Python JSON contract on a compact fixture.
+#[test]
+fn json_python_single_file_matches_expected_output() {
+    // Lock `__all__` handling, Python docstring stripping, and private-name export suppression.
+    let output = successful_stdout(run_uberview_with_args(
+        &fixture_path("json_contract/sample.py"),
+        &["--json"],
+    ));
+
+    assert_eq!(output, expected_json("expected/json_python_sample.json"));
+}
+
+/// Verify the machine-readable Markdown JSON contract on a compact fixture.
+#[test]
+fn json_markdown_single_file_matches_expected_output() {
+    // Lock heading-only structure, heading levels, section ranges, and nested child order.
+    let output = successful_stdout(run_uberview_with_args(
+        &fixture_path("json_contract/sample.md"),
+        &["--json"],
+    ));
+
+    assert_eq!(output, expected_json("expected/json_markdown_sample.json"));
+}
+
+/// Verify JSON mode is deterministic for repeated directory scans.
+#[test]
+fn json_directory_runs_produce_byte_identical_output() {
+    // Compare whole stdout documents so sorting, pretty-printing, and parallel parsing all stay deterministic.
+    let root = fixture_path("json_contract");
+    let first = successful_stdout(run_uberview_with_args(&root, &["--json"]));
+    let second = successful_stdout(run_uberview_with_args(&root, &["--json"]));
+
+    assert_eq!(first, second);
+}
+
+/// Verify inlineComments deliberately remain plain strings without line or range anchors.
+#[test]
+fn json_inline_comments_have_no_anchor_fields() {
+    // Guard the upstream design decision: comment order is the only anchor.
+    let output = successful_stdout(run_uberview_with_args(
+        &fixture_path("json_contract/sample.ts"),
+        &["--json"],
+    ));
+    let value: Value = serde_json::from_str(&output).expect("JSON output should parse");
+
+    assert_inline_comments_have_no_anchor_fields(&value);
+}
+
+/// Verify dynamic Python `__all__` falls back to the normal underscore public-surface rule.
+#[test]
+fn json_dynamic_python_all_does_not_hide_every_symbol() {
+    // Simulate an unprovable export list; treating it as empty would erase the public API surface.
+    let temp = tempdir().expect("failed to create temporary directory");
+    let file = temp.path().join("dynamic_all.py");
+    std::fs::write(
+        &file,
+        "__all__ = make_exports()\n\ndef visible():\n    return 1\n\ndef _hidden():\n    return 2\n",
+    )
+    .expect("failed to write python fixture");
+    let output = successful_stdout(run_uberview_with_args(&file, &["--json"]));
+    let value: Value = serde_json::from_str(&output).expect("JSON output should parse");
+    let symbols = value["files"][0]["symbols"]
+        .as_array()
+        .expect("symbols should be present");
+
+    assert_eq!(symbols[0]["name"], "visible");
+    assert_eq!(symbols[0]["exported"], true);
+    assert_eq!(symbols[1]["name"], "_hidden");
+    assert_eq!(symbols[1]["exported"], false);
+}
+
+/// Verify Rust `pub` visibility feeds the JSON exported field.
+#[test]
+fn json_rust_pub_items_are_exported() {
+    // Cover Rust because the JSON schema exposes `exported` for every supported source language.
+    let temp = tempdir().expect("failed to create temporary directory");
+    let file = temp.path().join("api.rs");
+    std::fs::write(
+        &file,
+        "pub struct PublicThing;\n\nstruct PrivateThing;\n\nimpl PublicThing {\n    pub fn run(&self) {}\n    fn helper(&self) {}\n}\n",
+    )
+    .expect("failed to write rust fixture");
+    let output = successful_stdout(run_uberview_with_args(&file, &["--json"]));
+    let value: Value = serde_json::from_str(&output).expect("JSON output should parse");
+    let symbols = value["files"][0]["symbols"]
+        .as_array()
+        .expect("symbols should be present");
+
+    assert_eq!(symbols[0]["name"], "PublicThing");
+    assert_eq!(symbols[0]["exported"], true);
+    assert_eq!(symbols[1]["name"], "PrivateThing");
+    assert_eq!(symbols[1]["exported"], false);
+    assert_eq!(symbols[2]["name"], "PublicThing");
+    assert_eq!(symbols[2]["children"][0]["name"], "run");
+    assert_eq!(symbols[2]["children"][0]["exported"], true);
+    assert_eq!(symbols[2]["children"][1]["name"], "helper");
+    assert_eq!(symbols[2]["children"][1]["exported"], false);
+}
+
+/// Verify `--show-json-schema` prints only the schema document and requires no input path.
+#[test]
+fn show_json_schema_outputs_schema_without_scanning_paths() {
+    // Exercise the no-path CLI surface so schema discovery works before a caller has scan inputs.
+    let output = run_uberview_args_only(&["--show-json-schema"]);
+    let (stdout, stderr) = decode_output(&output);
+    let value: Value = serde_json::from_str(&stdout).expect("schema output should be JSON");
+
+    assert!(output.status.success(), "schema command should succeed");
+    assert!(stderr.is_empty(), "schema command should not write stderr");
+    assert_eq!(value["$id"], "uberview/1");
+    assert_eq!(value["properties"]["schema"]["const"], "uberview/1");
 }
 
 /// Verify the Rust reduced-source contract on a representative single file.

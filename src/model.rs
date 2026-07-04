@@ -1,3 +1,4 @@
+use crate::language::LanguageKind;
 use crate::source::SourceText;
 
 /// A half-open byte span within the original source text.
@@ -101,6 +102,31 @@ impl DefinitionKind {
             Self::Variant => "Variant",
         }
     }
+
+    /// Return the stable machine-facing kind used by JSON output.
+    pub const fn json_kind(self) -> &'static str {
+        match self {
+            Self::Assignment => "assignment",
+            Self::Class => "class",
+            Self::Constant => "const",
+            Self::Enum => "enum",
+            Self::Field => "field",
+            Self::Function => "function",
+            Self::Heading => "heading",
+            Self::Impl => "impl",
+            Self::Interface => "interface",
+            Self::Macro => "macro",
+            Self::Method => "method",
+            Self::Module => "module",
+            Self::Namespace => "namespace",
+            Self::Property => "property",
+            Self::Struct => "struct",
+            Self::Trait => "trait",
+            Self::TypeAlias => "type_alias",
+            Self::Variable => "variable",
+            Self::Variant => "variant",
+        }
+    }
 }
 
 /// A source-ordered file section ready for rendering.
@@ -108,6 +134,8 @@ impl DefinitionKind {
 pub struct FileSection {
     /// The path shown in the section header.
     pub display_path: String,
+    /// The detected source language that shaped extraction.
+    pub language: LanguageKind,
     /// The original source text used for rendering retained slices.
     pub source: SourceText,
     /// The retained reduced-source items in source order.
@@ -155,6 +183,8 @@ pub struct Definition {
     pub kind: DefinitionKind,
     /// The source-derived symbol name shown in the synthetic header line.
     pub name: String,
+    /// Whether this symbol is part of the file's public surface by language-local rules.
+    pub exported: bool,
     /// The directly attached leading comment snippets that belong to this definition block.
     pub leading_comment_snippets: Vec<Snippet>,
     /// The full source extent of the definition.
